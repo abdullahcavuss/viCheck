@@ -166,7 +166,30 @@
     else toast("⚠ " + esc(j.error || T("Could not save")));
   }
 
+  // ------------------------------------------------ first-start help (also opened with the ? button)
+  function initWelcome() {
+    const dlg = document.getElementById("welcome");
+    if (!dlg || typeof dlg.showModal !== "function") return;
+    dlg.addEventListener("close", () => {
+      if (dlg.dataset.autoOpen === "1") {
+        dlg.dataset.autoOpen = "0";
+        fetch("/api/welcome-seen", { method: "POST" });
+      }
+    });
+    dlg.addEventListener("click", e => {
+      if (e.target === dlg) { dlg.close(); return; }   // click on the backdrop
+      const a = e.target.closest("a[href]");
+      if (a && !a.hasAttribute("lang") && dlg.dataset.autoOpen === "1") {   // a link (not the language switch): seen
+        dlg.dataset.autoOpen = "0";
+        navigator.sendBeacon ? navigator.sendBeacon("/api/welcome-seen") : fetch("/api/welcome-seen", { method: "POST", keepalive: true });
+      }
+    });
+    document.querySelectorAll("[data-help]").forEach(b => b.addEventListener("click", () => dlg.showModal()));
+    if (dlg.dataset.autoOpen === "1") dlg.showModal();
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
+    initWelcome();
     const f = document.getElementById("cmp-form");
     if (f) initHome(f);
     const tg = document.querySelector("[data-head-toggle]");

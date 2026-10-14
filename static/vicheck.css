@@ -116,3 +116,27 @@ textarea { width: 100%; font-family: var(--mono); font-size: 12.5px; padding: 8p
 .report-opts { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border); }
 .export-opts { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; padding: 8px 12px; margin: 0 0 12px; }
 .export-opts .chk { display: inline-flex; gap: 5px; align-items: center; font-size: 12.5px; }
+
+/* first-start help */
+.topbtn.help { width: 26px; height: 26px; padding: 0; border-radius: 50%; font-weight: 700; justify-content: center; }
+dialog.welcome { border: 0; border-radius: 10px; padding: 0; width: min(680px, calc(100vw - 32px)); max-height: calc(100vh - 40px);
+  box-shadow: 0 18px 50px rgba(0,0,0,.35); color: var(--text); background: var(--panel); }
+dialog.welcome::backdrop { background: rgba(15, 20, 28, .55); }
+.welcome-in { padding: 20px 24px 18px; display: flex; flex-direction: column; gap: 10px; }
+.welcome-head { display: flex; align-items: center; gap: 12px; }
+.welcome-head h2 { margin: 0; font-size: 19px; }
+.welcome .langsw { border-color: var(--border); }
+.welcome .langsw a { color: var(--text-2); }
+.welcome .langsw a.on { background: var(--panel-2); color: var(--text); }
+.welcome-in > p { margin: 0; line-height: 1.5; }
+.welcome-steps { margin: 4px 0 0; padding: 0; list-style: none; counter-reset: st; display: flex; flex-direction: column; gap: 10px; }
+.welcome-steps li { counter-increment: st; display: grid; grid-template-columns: 28px 1fr; column-gap: 10px; font-size: 13px; line-height: 1.5; }
+.welcome-steps li::before { content: counter(st); grid-row: span 2; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff;
+  font-weight: 700; font-size: 12.5px; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+.welcome-steps li span { color: var(--text-2); }
+.welcome-steps kbd { font: 11.5px var(--mono); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--panel-2); }
+.welcome-foot { display: flex; align-items: center; gap: 12px; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--border); }
+.welcome-note { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; line-height: 1.5; padding: 9px 12px; border-radius: 7px;
+  background: var(--panel-2); border: 1px solid var(--border); }
+.welcome-note span { color: var(--text-2); }
+.welcome-note.warn { background: var(--mod-bg); border-color: rgba(217,119,6,.4); }

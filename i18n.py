@@ -101,6 +101,27 @@ TR.update({
     "A Markdown report: summary table, every changed VI with its change list and one SVG with the A and B block diagrams.":
         "Markdown rapor: özet tablo, her değişen VI için değişiklik listesi ve A ile B blok diyagramlarını içeren bir SVG.",
     "Generate report": "Raporu oluştur",
+    # ---------------------------------------------------------------- first-start help
+    "How to use viCheck": "viCheck nasıl kullanılır",
+    "Welcome to viCheck": "viCheck'e hoş geldiniz",
+    "viCheck compares two LabVIEW VIs or two folders. Block diagrams are read without LabVIEW and drawn side by side as SVG; your files are only read, never changed.":
+        "viCheck iki LabVIEW VI'ını ya da iki klasörü karşılaştırır. Blok diyagramlar LabVIEW olmadan okunur ve yan yana SVG olarak çizilir; dosyalarınız yalnızca okunur, asla değiştirilmez.",
+    "Choose A and B": "A ve B'yi seçin",
+    "A is the old / reference version, B the new one. Pick a VI or a folder for each with <i>Choose VI…</i> / <i>Choose folder…</i>, paste a path, or drag files onto the boxes (two at once fill A and B).":
+        "A eski / referans sürüm, B yeni sürümdür. Her biri için <i>VI seç…</i> / <i>Klasör seç…</i> ile bir VI ya da klasör seçin, yolu yapıştırın veya dosyaları kutulara sürükleyin (aynı anda iki dosya A ve B'yi doldurur).",
+    "Two VIs open the block diagram diff. Two folders list the files that differ; open a VI with <i>Block diagram diff →</i>.":
+        "İki VI blok diyagram karşılaştırmasını açar. İki klasörde farklı dosyalar listelenir; bir VI'ı <i>Blok diyagram farkı →</i> ile açın.",
+    "Read the diff": "Farkları inceleyin",
+    "The list on the left holds every change; click one (or use <kbd>j</kbd> / <kbd>k</kbd>) and both diagrams pan to it. Green = added, red = removed, orange = modified, purple = moved to another frame. <i>▴ Hide</i> folds the file details to give the list more room.":
+        "Soldaki listede tüm değişiklikler var; birine tıklayın (ya da <kbd>j</kbd> / <kbd>k</kbd>), iki diyagram da oraya gider. Yeşil = eklendi, kırmızı = silindi, turuncu = değişti, mor = başka çerçeveye taşındı. <i>▴ Gizle</i> dosya ayrıntılarını katlayıp listeye yer açar.",
+    "Save and share": "Kaydedin ve paylaşın",
+    "<i>📄 PDF</i> makes a report with readable detail views of every change; <i>🖼 Export SVG</i> and <i>⬇ Save view as SVG</i> save the drawings. For two folders, <i>📄 Report with SVG images…</i> covers every changed VI.":
+        "<i>📄 PDF</i> her değişikliğin okunaklı detay görünümleriyle bir rapor üretir; <i>🖼 SVG dışa aktar</i> ve <i>⬇ Görünümü SVG kaydet</i> çizimleri kaydeder. İki klasörde <i>📄 SVG resimli rapor…</i> tüm değişen VI'ları kapsar.",
+    "Inspect the SVG": "SVG'yi inceleyin",
+    "Right-click → <i>Inspect</i>, or <i>↗ Open in browser</i> and press F12.":
+        "Sağ tık → <i>İncele</i>, ya da <i>↗ Tarayıcıda aç</i> ve F12.",
+    "You can open this again with the <b>?</b> button at the top.": "Bu pencereyi üstteki <b>?</b> düğmesiyle yeniden açabilirsiniz.",
+    "Start": "Başla",
     # ---------------------------------------------------------------- PDF, detail views, sidebar
     "Hide or show the file details": "Dosya ayrıntılarını gizle / göster",
     "Hide": "Gizle",
@@ -113,6 +134,24 @@ TR.update({
         "Kapalı: değişiklik olan her Stacked Sequence çerçevesi için ayrı resim (daha dar, sayfada daha okunaklı)",
     "Stacked Sequence → Flat": "Stacked Sequence → Flat",
     "Open PDF": "PDF'i aç",
+    "Contents": "İçerik",
+    "Changes to include": "Dahil edilecek değişiklikler",
+    "Drawing": "Çizim",
+    "Summary tables": "Özet tabloları",
+    "Change list of every VI": "Her VI'ın değişiklik listesi",
+    "Change list": "Değişiklik listesi",
+    "The whole A and B block diagram in one SVG, fitted to the page": "A ve B blok diyagramının tamamı tek SVG'de, sayfaya sığdırılmış",
+    "Whole diagram (A + B)": "Diyagramın tamamı (A + B)",
+    "Unreadable, out-of-scope and re-saved VIs, and the other changed files": "Okunamayan, kapsam dışı ve sadece yeniden kaydedilmiş VI'lar ile değişen diğer dosyalar",
+    "Other files and VIs": "Diğer dosyalar ve VI'lar",
+    "Primitive names and your LabVIEW version": "Primitive adları ve LabVIEW sürümünüz",
+    "The primitive names are being read from the LabVIEW palettes now.": "Primitive adları şu anda LabVIEW paletlerinden okunuyor.",
+    "{n} primitive names were read from {src}.": "{n} primitive adı {src} kurulumundan okundu.",
+    "{n} primitive names are known.": "{n} primitive adı tanımlı.",
+    "No LabVIEW installation was found on this computer, so primitives (Add, Array Size, …) are shown by number, e.g. <code>#1809</code>.":
+        "Bu bilgisayarda LabVIEW kurulumu bulunamadı; bu yüzden primitive'ler (Add, Array Size, …) numarayla gösterilir, ör. <code>#1809</code>.",
+    "VI files store primitives only by number and the names come from the palettes of a LabVIEW installation. If your VIs were made with another LabVIEW version, or LabVIEW is not installed here, import the names from that version's folder on the <a href=\"{url}\">Primitive names</a> page; you can also name a primitive by double-clicking it on a diagram.":
+        "VI dosyaları primitive'leri yalnızca numarayla saklar; adlar bir LabVIEW kurulumunun paletlerinden gelir. VI'larınız başka bir LabVIEW sürümüyle yapıldıysa ya da burada LabVIEW kurulu değilse, adları o sürümün klasöründen <a href=\"{url}\">Primitive adları</a> sayfasında içe aktarın; bir primitive'e diyagramda çift tıklayarak da ad verebilirsiniz.",
     "Could not make the PDF:": "PDF oluşturulamadı:",
     "PDF needs Microsoft Edge or Google Chrome": "PDF için Microsoft Edge veya Google Chrome gerekli",
     "PDF": "PDF",

@@ -5,7 +5,6 @@ __pycache__/
 *.py[cod]
 test_out/
 
-# Test VIs belong to the JKI State Machine project (BSD license); not redistributed here.
-# Create them with: python tools/make_testdata.py
-testdata/*
-!testdata/README.md
+# Local test data (VIs of other projects) and the script that downloads it: not part of the repository
+testdata/
+tools/make_testdata.py

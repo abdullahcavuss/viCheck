@@ -33,5 +33,4 @@ viCheck does not contain or redistribute any National Instruments software or fi
 run time from the function palettes of the LabVIEW installation on the user's own computer and stored only in the
 user's local data folder (`%LOCALAPPDATA%\viCheck`).
 
-The test VIs used during development (JKI State Machine, NI LabVIEW Icon Editor) are not part of the repository;
-`tools/make_testdata.py` downloads them from their own repositories.
+The test VIs used during development (JKI State Machine, NI LabVIEW Icon Editor) are not part of the repository.

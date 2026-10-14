@@ -15,9 +15,20 @@ if not exist ".venv\Scripts\python.exe" (
 ".venv\Scripts\python.exe" -m PyInstaller vicheck.spec --noconfirm --clean || (pause & exit /b 1)
 echo Zipping dist\viCheck-win64.zip ...
 powershell -NoProfile -Command "Compress-Archive -Path 'dist\viCheck' -DestinationPath 'dist\viCheck-win64.zip' -Force" || echo Could not create the zip ^(the folder is still usable^).
+REM --- installer (Inno Setup 6; skipped when it is not installed)
+for /f "usebackq delims=" %%v in (`.venv\Scripts\python.exe -c "import re;print(re.search('^VERSION = .(.+?).$',open('app.py',encoding='utf-8').read(),re.M).group(1))"`) do set VER=%%v
+set ISCC=
+for %%p in ("%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" "%ProgramFiles%\Inno Setup 6\ISCC.exe") do if exist %%p set ISCC=%%p
+if defined ISCC (
+    echo Building the installer ^(viCheck %VER%^)...
+    %ISCC% /Q /DAppVersion=%VER% installer\viCheck.iss && set SETUP=dist\viCheck-Setup-%VER%.exe
+) else (
+    echo Inno Setup 6 not found - no installer. Install it with:  winget install JRSoftware.InnoSetup
+)
 echo.
 echo ============================================================
 echo  Done:  %~dp0dist\viCheck\viCheck.exe
 echo  On another PC: copy the whole dist\viCheck folder, or unzip dist\viCheck-win64.zip
+if defined SETUP echo  Installer:     %~dp0%SETUP%
 echo ============================================================
 pause

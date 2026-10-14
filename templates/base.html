@@ -23,6 +23,7 @@ window.T = function (s, kw) { var r = (window.I18N && window.I18N[s]) || s; if (
     <a href="{{ url_for('index') }}">{{ _("New comparison") }}</a>
     <a href="{{ url_for('primitives_page') }}">{{ _("Primitive names") }}</a>
     <a href="{{ url_for('about') }}">{{ _("About") }}</a>
+    <button type="button" class="topbtn help" data-help title="{{ _("How to use viCheck") }}">?</button>
     {% if ui_mode != "browser" %}<button type="button" class="topbtn" data-open-browser title="{{ _("Open this page in your web browser — e.g. to inspect the SVG with the browser's developer tools (F12)") }}">{{ _("↗ Open in browser") }}</button>{% endif %}
     <span class="langsw" title="{{ _("Language") }}">{% for code in langs %}<a href="{{ url_for('set_lang', code=code, next=request.full_path if request.query_string else request.path) }}" class="{{ 'on' if code == lang }}" lang="{{ code }}">{{ code|upper }}</a>{% endfor %}</span>
   </nav>
@@ -32,6 +33,7 @@ window.T = function (s, kw) { var r = (window.I18N && window.I18N[s]) || s; if (
   {% block content %}{% endblock %}
 </main>
 {% endblock %}
+{% include "_welcome.html" %}
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 <script src="{{ url_for('static', filename='vicheck.js') }}"></script>
 {% block scripts %}{% endblock %}

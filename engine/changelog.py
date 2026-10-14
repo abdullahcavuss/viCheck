@@ -19,6 +19,12 @@ from .vi_diff import CATEGORIES, CHANGE_CATEGORY, change_cat
 
 DEFAULT_CATS = ("logic", "fp")
 
+# parts of the report that can be left out (PDF / Markdown):
+#   summary  summary tables          lists     change lists of every VI
+#   overview whole A + B diagram     details   cropped A + B views of the changes
+#   others   unreadable / out of scope / re-saved VIs and the other files
+INCLUDE_ALL = ("summary", "lists", "overview", "details", "others")
+
 IMG_DIR = "changelog-images"
 
 KIND_TXT = {
@@ -127,8 +133,9 @@ def _prim_sub(text, names):
 
 
 def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_tiles=False, cats=None,
-             flat=True, details=False):
+             flat=True, details=False, include=None):
     cats = set(cats or DEFAULT_CATS)
+    inc = set(include) if include is not None else set(INCLUDE_ALL) - ({"details"} if not details else set())
     head = store.get_commit(repo, head_ref)
     if head is None:
         raise ValueError("New version not found")
@@ -179,40 +186,8 @@ def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_t
     L.append("")
 
     # ---- summary
-    L.append("## Summary")
-    L.append("")
-    L.append("| | Count |")
-    L.append("|---|---:|")
-    L.append("| VIs with content changes | %d |" % len(functional))
-    L.append("| VIs with visual/layout changes only | %d |" % len(layout))
-    if "saved" in cats:
-        L.append("| VIs re-saved only | %d |" % len(saved))
-    if excluded:
-        L.append("| VIs out of scope | %d |" % len(excluded))
-    if errors:
-        L.append("| Unreadable VIs | %d |" % len(errors))
-    L.append("| Other file changes | %d |" % len(other))
-    L.append("")
-
-    # ---- short summary of the changed VIs (details and images below)
-    if functional or layout:
-        L.append("### Changed VIs")
-        L.append("")
-        L.append("| VI | Status | What changed |")
-        L.append("|---|---|---|")
-        for grp, item in [("content", it) for it in functional] + [("layout", it) for it in layout]:
-            c = item["c"]
-            name = c["path"].split("/")[-1]
-            folder = "/".join(c["path"].split("/")[:-1])
-            st = {"added": "🟩 New", "deleted": "🟥 Deleted", "modified": "🟧 Modified"}[c["status"]]
-            if grp == "layout":
-                st += " (layout)"
-            L.append("| [%s](#%s)%s | %s | %s |" % (md_escape(name), anchor(c["path"]),
-                                                  ("<br>`%s`" % md_escape(folder)) if folder else "",
-                                                  st, md_escape(_brief(item, names, cats))))
-        L.append("")
-        L.append("_Details and images are below; click a VI name to jump to its section._")
-        L.append("")
+    if "summary" in inc:
+        L.extend(_summary(functional, layout, saved, excluded, errors, other, cats, names))
 
     # ---- commits
     cl = commits_between(store, repo, base["id"] if base else None, head["id"])
@@ -241,9 +216,9 @@ def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_t
         for item in group:
             if progress:
                 progress(total, total, "images: " + item["c"]["path"])
-            L.extend(_vi_section(item, out_dir, names, all_tiles, cats, flat=flat, details=details))
+            L.extend(_vi_section(item, out_dir, names, all_tiles, cats, flat=flat, include=inc))
 
-    if errors:
+    if errors and "others" in inc:
         L.append("## Unreadable VIs")
         L.append("")
         for item in errors:
@@ -251,7 +226,7 @@ def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_t
             L.append("- `%s` — %s" % (item["c"]["path"], md_escape(msg)))
         L.append("")
 
-    if excluded:
+    if excluded and "others" in inc:
         L.append("## VIs out of scope")
         L.append("")
         L.append("<details><summary>%d VI(s) — changes only in categories that were not selected</summary>" % len(excluded))
@@ -263,7 +238,7 @@ def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_t
         L.append("</details>")
         L.append("")
 
-    if saved:
+    if saved and "others" in inc:
         L.append("## VIs re-saved only")
         L.append("")
         L.append("<details><summary>%d VI(s) — content unchanged (revision / compiled code / internal numbers)</summary>" % len(saved))
@@ -276,7 +251,7 @@ def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_t
         L.append("")
 
     # ---- other files
-    if other:
+    if other and "others" in inc:
         L.append("## Other files")
         L.append("")
         for c in other:
@@ -310,7 +285,48 @@ def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_t
             "cats": sorted(cats)}
 
 
-def _vi_section(item, out_dir, names, all_tiles, cats, flat=True, details=False):
+def _summary(functional, layout, saved, excluded, errors, other, cats, names):
+    L = []
+    L.append("## Summary")
+
+    L.append("")
+    L.append("| | Count |")
+    L.append("|---|---:|")
+    L.append("| VIs with content changes | %d |" % len(functional))
+    L.append("| VIs with visual/layout changes only | %d |" % len(layout))
+    if "saved" in cats:
+        L.append("| VIs re-saved only | %d |" % len(saved))
+    if excluded:
+        L.append("| VIs out of scope | %d |" % len(excluded))
+    if errors:
+        L.append("| Unreadable VIs | %d |" % len(errors))
+    L.append("| Other file changes | %d |" % len(other))
+    L.append("")
+
+    # ---- short summary of the changed VIs (details and images below)
+    if functional or layout:
+        L.append("### Changed VIs")
+        L.append("")
+        L.append("| VI | Status | What changed |")
+        L.append("|---|---|---|")
+        for grp, item in [("content", it) for it in functional] + [("layout", it) for it in layout]:
+            c = item["c"]
+            name = c["path"].split("/")[-1]
+            folder = "/".join(c["path"].split("/")[:-1])
+            st = {"added": "🟩 New", "deleted": "🟥 Deleted", "modified": "🟧 Modified"}[c["status"]]
+            if grp == "layout":
+                st += " (layout)"
+            L.append("| [%s](#%s)%s | %s | %s |" % (md_escape(name), anchor(c["path"]),
+                                                  ("<br>`%s`" % md_escape(folder)) if folder else "",
+                                                  st, md_escape(_brief(item, names, cats))))
+        L.append("")
+        L.append("_Details and images are below; click a VI name to jump to its section._")
+        L.append("")
+    return L
+
+
+def _vi_section(item, out_dir, names, all_tiles, cats, flat=True, details=False, include=None):
+    inc = set(include) if include is not None else set(INCLUDE_ALL) - ({"details"} if not details else set())
     c, d, verdict = item["c"], item["d"], item["verdict"]
     res = d["diff"]
     L = []
@@ -324,7 +340,7 @@ def _vi_section(item, out_dir, names, all_tiles, cats, flat=True, details=False)
     L.append("")
     shown = [p for p in item["parts"] if p["key"] not in ("bd", "version", "bd_notes")
              and not (p["key"] == "bd_layout" and any(ch["kind"] == "moved" for ch in res["changes"]))]
-    for p in shown:
+    for p in (shown if "lists" in inc else []):
         L.append("- **%s**%s" % (p["label"], (": " + md_escape(_prim_sub(p["detail"], names))) if p.get("detail") else ""))
     if shown:
         L.append("")
@@ -334,7 +350,7 @@ def _vi_section(item, out_dir, names, all_tiles, cats, flat=True, details=False)
     changes.sort(key=lambda ch: (order.get(change_cat(ch), 0), bool(ch.get("reframe"))))  # frame-only moves last
     if c["status"] != "modified":
         changes = []  # in a new/deleted VI every item is "added/removed"; the image is enough instead of a list
-    if changes:
+    if changes and "lists" in inc:
         L.append("**Block diagram changes**" if any(change_cat(ch) == "logic" for ch in changes)
                  else "**Block diagram layout changes**")
         L.append("")
@@ -373,10 +389,11 @@ def _vi_section(item, out_dir, names, all_tiles, cats, flat=True, details=False)
         new_bd, hn, rn = None, {}, []
     has_old = bool(old_bd and old_bd.get("nodes"))
     has_new = bool(new_bd and new_bd.get("nodes"))
-    if (has_old or has_new) and not (c["status"] == "modified" and not (rn or ro)):
+    if (has_old or has_new) and not (c["status"] == "modified" and not (rn or ro)) and inc & {"overview", "details"}:
         try:
             views = svgrender.render_pair(old_bd if has_old else None, ho, ro, new_bd if has_new else None, hn, rn,
-                                          base, names, old_title=old_t, new_title=new_t, flat=flat, details=details)
+                                          base, names, old_title=old_t, new_title=new_t, flat=flat,
+                                          details="details" in inc)
         except Exception as e:  # an image failure for one VI must not stop the whole CHANGELOG
             import logging
             logging.exception("Could not render CHANGELOG image: %s", c["path"])
@@ -387,20 +404,23 @@ def _vi_section(item, out_dir, names, all_tiles, cats, flat=True, details=False)
             L.append("**Block diagram — previous and new version**")
             L.append("")
         for vi, v in enumerate(views, 1):
-            if len(views) > 1 or v["desc"]:
-                L.append("_View %d%s%s_" % (vi, (" — " + "; ".join(v["desc"])) if v["desc"] else "",
-                                              (" · change " + num_ranges(v["nums"])) if v["nums"] else ""))
+            if "overview" in inc:
+                if len(views) > 1 or v["desc"]:
+                    L.append("_View %d%s%s_" % (vi, (" — " + "; ".join(v["desc"])) if v["desc"] else "",
+                                                  (" · change " + num_ranges(v["nums"])) if v["nums"] else ""))
+                    L.append("")
+                rel = os.path.relpath(v["file"], out_dir).replace(os.sep, "/").replace(" ", "%20")
+                L.append("[![%s — previous and new version](%s)](%s)" % (md_escape(title), rel, rel))
                 L.append("")
-            rel = os.path.relpath(v["file"], out_dir).replace(os.sep, "/").replace(" ", "%20")
-            L.append("[![%s — previous and new version](%s)](%s)" % (md_escape(title), rel, rel))
-            L.append("")
+            else:
+                os.remove(v["file"])   # the whole diagram is not wanted in the report
             for k, dv in enumerate(v.get("details") or [], 1):
                 drel = os.path.relpath(dv["file"], out_dir).replace(os.sep, "/").replace(" ", "%20")
                 L.append("_Detail %d · change %s_" % (k, num_ranges(dv["nums"])))
                 L.append("")
                 L.append("[![%s — detail](%s)](%s)" % (md_escape(title), drel, drel))
                 L.append("")
-        if views:
+        if views and "overview" in inc:
             L.append("_The image is an SVG: click to open it full size; it stays sharp when you zoom in the browser._")
             L.append("")
     L.append("---")

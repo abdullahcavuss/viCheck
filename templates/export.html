@@ -11,7 +11,10 @@
 <form class="card export-opts" method="get" action="{{ url_for('export_svg') }}">
   <input type="hidden" name="a" value="{{ a or '' }}"><input type="hidden" name="b" value="{{ b or '' }}">
   <label class="chk"><input type="checkbox" name="pdf" value="1" {{ 'checked' if opts.pdf }}> {{ _("PDF") }}</label>
-  <input type="hidden" name="details" value="0"><label class="chk"><input type="checkbox" name="details" value="1" {{ 'checked' if opts.details }}> {{ _("Detail views around the changes") }}</label>
+  <input type="hidden" name="inc_sent" value="1">
+  <label class="chk"><input type="checkbox" name="inc" value="lists" {{ 'checked' if 'lists' in opts.include }}> {{ _("Change list") }}</label>
+  <label class="chk"><input type="checkbox" name="inc" value="overview" {{ 'checked' if 'overview' in opts.include }}> {{ _("Whole diagram (A + B)") }}</label>
+  <label class="chk"><input type="checkbox" name="inc" value="details" {{ 'checked' if 'details' in opts.include }}> {{ _("Detail views around the changes") }}</label>
   <input type="hidden" name="flat" value="0"><label class="chk"><input type="checkbox" name="flat" value="1" {{ 'checked' if opts.flat }}> {{ _("Stacked Sequence → Flat") }}</label>
   <button class="btn sm">↻ {{ _("Generate again") }}</button>
 </form>

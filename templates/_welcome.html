@@ -1,0 +1,38 @@
+<dialog class="welcome" id="welcome" data-auto-open="{{ '1' if show_welcome else '0' }}">
+  <form method="dialog" class="welcome-in">
+    <div class="welcome-head">
+      <h2>{{ _("Welcome to viCheck") }}</h2>
+      <span class="grow"></span>
+      <span class="langsw" title="{{ _("Language") }}">{% for code in langs %}<a href="{{ url_for('set_lang', code=code, next=request.full_path if request.query_string else request.path) }}" class="{{ 'on' if code == lang }}" lang="{{ code }}">{{ code|upper }}</a>{% endfor %}</span>
+    </div>
+    <p class="muted">{{ _("viCheck compares two LabVIEW VIs or two folders. Block diagrams are read without LabVIEW and drawn side by side as SVG; your files are only read, never changed.") }}</p>
+    <ol class="welcome-steps">
+      <li><b>{{ _("Choose A and B") }}</b>
+        <span>{{ _("A is the old / reference version, B the new one. Pick a VI or a folder for each with <i>Choose VI…</i> / <i>Choose folder…</i>, paste a path, or drag files onto the boxes (two at once fill A and B).")|safe }}</span></li>
+      <li><b>{{ _("Compare") }}</b>
+        <span>{{ _("Two VIs open the block diagram diff. Two folders list the files that differ; open a VI with <i>Block diagram diff →</i>.")|safe }}</span></li>
+      <li><b>{{ _("Read the diff") }}</b>
+        <span>{{ _("The list on the left holds every change; click one (or use <kbd>j</kbd> / <kbd>k</kbd>) and both diagrams pan to it. Green = added, red = removed, orange = modified, purple = moved to another frame. <i>▴ Hide</i> folds the file details to give the list more room.")|safe }}</span></li>
+      <li><b>{{ _("Save and share") }}</b>
+        <span>{{ _("<i>📄 PDF</i> makes a report with readable detail views of every change; <i>🖼 Export SVG</i> and <i>⬇ Save view as SVG</i> save the drawings. For two folders, <i>📄 Report with SVG images…</i> covers every changed VI.")|safe }}</span></li>
+      <li><b>{{ _("Inspect the SVG") }}</b>
+        <span>{{ _("Right-click → <i>Inspect</i>, or <i>↗ Open in browser</i> and press F12.")|safe }}</span></li>
+    </ol>
+    {% set ps = prim_status() %}
+    <div class="welcome-note {{ 'warn' if not ps.count and not ps.running }}">
+      <b>{{ _("Primitive names and your LabVIEW version") }}</b>
+      <span>
+      {% if ps.running %}{{ _("The primitive names are being read from the LabVIEW palettes now.") }}
+      {% elif ps.sources %}{{ _("{n} primitive names were read from {src}.", n=ps.count, src=ps.sources|join(", ")) }}
+      {% elif ps.count %}{{ _("{n} primitive names are known.", n=ps.count) }}
+      {% else %}{{ _("No LabVIEW installation was found on this computer, so primitives (Add, Array Size, …) are shown by number, e.g. <code>#1809</code>.")|safe }}{% endif %}
+      {{ _("VI files store primitives only by number and the names come from the palettes of a LabVIEW installation. If your VIs were made with another LabVIEW version, or LabVIEW is not installed here, import the names from that version's folder on the <a href=\"{url}\">Primitive names</a> page; you can also name a primitive by double-clicking it on a diagram.", url=url_for('primitives_page'))|safe }}
+      </span>
+    </div>
+    <div class="welcome-foot">
+      <span class="small muted">{{ _("You can open this again with the <b>?</b> button at the top.")|safe }}</span>
+      <span class="grow"></span>
+      <button class="btn primary" value="ok" autofocus>{{ _("Start") }}</button>
+    </div>
+  </form>
+</dialog>

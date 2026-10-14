@@ -20,12 +20,19 @@
         <form method="post" action="{{ url_for('report_start') }}" class="report-form">
           <input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="b" value="{{ b }}">
           <div class="small muted" style="margin-bottom:6px">{{ _("A Markdown report: summary table, every changed VI with its change list and one SVG with the A and B block diagrams.") }}</div>
+          <div class="small muted" style="margin:2px 0 2px">{{ _("Changes to include") }}</div>
           {% for k, t in categories %}
           <label class="chk"><input type="checkbox" name="cat" value="{{ k }}" {{ 'checked' if k in default_cats }}> {{ _(t) }}</label>
           {% endfor %}
           <div class="report-opts">
             <label class="chk"><input type="checkbox" name="pdf" value="1" checked> <b>{{ _("Also make a PDF") }}</b></label>
-            <label class="chk" title="{{ _("For large VIs: a cropped A + B view of every group of nearby changes, printed at about 1:1") }}"><input type="checkbox" name="details" value="1" checked> {{ _("Detail views around the changes") }}</label>
+            <div class="small muted" style="margin:6px 0 2px">{{ _("Contents") }}</div>
+            <label class="chk"><input type="checkbox" name="inc" value="summary" checked> {{ _("Summary tables") }}</label>
+            <label class="chk"><input type="checkbox" name="inc" value="lists" checked> {{ _("Change list of every VI") }}</label>
+            <label class="chk" title="{{ _("The whole A and B block diagram in one SVG, fitted to the page") }}"><input type="checkbox" name="inc" value="overview" checked> {{ _("Whole diagram (A + B)") }}</label>
+            <label class="chk" title="{{ _("For large VIs: a cropped A + B view of every group of nearby changes, printed at about 1:1") }}"><input type="checkbox" name="inc" value="details" checked> {{ _("Detail views around the changes") }}</label>
+            <label class="chk" title="{{ _("Unreadable, out-of-scope and re-saved VIs, and the other changed files") }}"><input type="checkbox" name="inc" value="others" checked> {{ _("Other files and VIs") }}</label>
+            <div class="small muted" style="margin:6px 0 2px">{{ _("Drawing") }}</div>
             <label class="chk" title="{{ _("Off: one image per Stacked Sequence frame that has changes (narrower, easier to read on a page)") }}"><input type="checkbox" name="flat" value="1"> {{ _("Stacked Sequence → Flat") }}</label>
           </div>
           <button class="btn sm primary" style="margin-top:8px">{{ _("Generate report") }}</button>

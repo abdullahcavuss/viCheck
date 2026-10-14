@@ -113,7 +113,23 @@ def translate_message(msg, lang=None):
 def inject_globals():
     lang = get_lang()
     return {"app_name": APP_NAME, "app_version": VERSION, "ui_mode": UI["mode"], "lang": lang,
-            "langs": i18n.LANGS, "_": _, "_n": _n, "i18n_js": json.dumps(i18n.js_table(lang), ensure_ascii=False)}
+            "langs": i18n.LANGS, "_": _, "_n": _n, "i18n_js": json.dumps(i18n.js_table(lang), ensure_ascii=False),
+            "show_welcome": not store.settings().get("welcome_seen"), "prim_status": prim_status}
+
+
+def prim_status():
+    """For the first-start help: how many primitive names are known and where they came from."""
+    rows = store.prim_name_rows()
+    srcs = sorted({r["source"] for r in rows if r["source"] != "user"})
+    return {"count": len(rows), "sources": [s.replace("palette: ", "") for s in srcs],
+            "running": bool(PRIM_JOB.get("running")), "installs": palettes.find_installations()}
+
+
+@app.route("/api/welcome-seen", methods=["POST"])
+def api_welcome_seen():
+    """The first-start help was closed: do not open it by itself again (the ? button still shows it)."""
+    store.save_settings(welcome_seen=True)
+    return jsonify({"ok": True})
 
 
 @app.route("/lang/<code>")
@@ -331,7 +347,9 @@ def export_svg():
     want_pdf = flag("pdf", False)
     # PDF: Stacked Sequences frame by frame (unfolded they make very wide, tiny pages); SVG: as in the viewer
     flat = flag("flat", not want_pdf)
-    details = flag("details", True)
+    # report contents: the options form sends inc=… for every ticked part (and inc_sent=1)
+    include = request.args.getlist("inc") if request.args.get("inc_sent") else list(report_mod.INCLUDE_ALL)
+    details = "details" in include
     old_sha = store.register(a) if a else None
     new_sha = store.register(b) if b else None
     name = os.path.basename(b or a)
@@ -347,10 +365,10 @@ def export_svg():
             "base_short": "A", "head_short": "B", "old_title": "A", "new_title": "B"}
     cats = set(c for c, _ in CATEGORIES)
     lang = get_lang()
-    lines = report_mod._vi_section(item, out, store.prim_names(), False, cats, flat=flat, details=details)
+    lines = report_mod._vi_section(item, out, store.prim_names(), False, cats, flat=flat, include=include)
     img_dir = os.path.join(out, report_mod.IMG_DIR)
     svgs = sorted(f for f in os.listdir(img_dir) if f.endswith(".svg")) if os.path.isdir(img_dir) else []
-    if not svgs:
+    if not svgs and include and {"overview", "details"} & set(include):
         # no marked block diagram changes: still draw both diagrams so they can be looked at as SVG
         old_bd = d["old"].get("bd") if not d["old"].get("empty") else None
         new_bd = d["new"].get("bd") if not d["new"].get("empty") else None
@@ -378,7 +396,7 @@ def export_svg():
     body = mdlite.render(section, url_for("export_file", jid=jid, fpath=""))
     return render_template("export.html", jid=jid, name=name, a=a, b=b, svgs=svgs, out=out, body=body,
                            back=url_for("vidiff_view", a=a, b=b), pdf=pdf, pdf_error=pdf_error,
-                           opts={"pdf": want_pdf, "flat": flat, "details": details})
+                           opts={"pdf": want_pdf, "flat": flat, "details": details, "include": include})
 
 
 @app.route("/api/save-svg", methods=["POST"])
@@ -448,13 +466,14 @@ def report_start():
     cats = request.form.getlist("cat") or list(report_mod.DEFAULT_CATS)
     want_pdf = request.form.get("pdf") == "1"
     flat = request.form.get("flat") == "1"
-    details = request.form.get("details") == "1"
+    include = request.form.getlist("inc")
+    details = "details" in include
     jid = "report-" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     out = os.path.join(store.export_dir, jid)
     os.makedirs(out, exist_ok=True)
     meta = {"id": jid, "a": a, "b": b, "running": True, "done": 0, "total": 0, "current": "", "error": None,
             "result": None, "cats": cats, "out": out, "pdf": None, "pdf_error": None,
-            "opts": {"pdf": want_pdf, "flat": flat, "details": details}}
+            "opts": {"pdf": want_pdf, "flat": flat, "details": details, "include": include}}
     REPORTS[jid] = meta
     lang = get_lang()   # the worker thread has no request
 
@@ -467,11 +486,12 @@ def report_start():
             def prog(d, t, cur):
                 meta.update(done=d, total=t, current=cur)
             meta["result"] = report_mod.generate(rs, vis, {"name": "viCheck"}, "A", "B", out, progress=prog, cats=cats,
-                                                 flat=flat, details=details)
+                                                 flat=flat, include=include)
             md_path = os.path.join(out, "CHANGELOG.md")
             with open(md_path, encoding="utf-8") as f:
                 md = f.read()
-            body = md[md.index("## Summary"):] if "## Summary" in md else md
+            m = re.search(r"^## ", md, re.M)   # drop the generator's own title (viCheck writes its own header)
+            body = md[m.start():] if m else ""
             head = i18n.REPORT_HEAD[lang].format(
                 a=a, b=b, now=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), ver=VERSION,
                 scope=", ".join(i18n.translate(t, lang) for k, t in CATEGORIES if k in cats))

@@ -1,7 +1,5 @@
 # viCheck — LabVIEW VI / folder comparison
 
-**English** · [Türkçe](README.tr.md)
-
 Compares two VIs or two folders. Block diagrams are parsed **without LabVIEW** and drawn side by side as **SVG**.
 The engine (pylabview + diff + drawing) is the same as in the VIVER project; viCheck only compares — no repositories or commits.
 
@@ -20,6 +18,18 @@ git clone --recursive https://github.com/abdullahcavuss/viCheck.git
 
 To try it without building: `run.bat`.
 
+### Installer
+
+If [Inno Setup 6](https://jrsoftware.org/isinfo.php) is installed (`winget install JRSoftware.InnoSetup`), `build.bat`
+also makes **`dist\viCheck-Setup-<version>.exe`** from `installer/viCheck.iss`:
+
+- installs for the current user without administrator rights (or for all users, chosen in the setup);
+- Start menu shortcut, optional desktop shortcut, uninstaller in Windows' *Installed apps*;
+- English or Turkish setup; an update installs over the previous version;
+- settings and cache in `%LOCALAPPDATA%\viCheck` are kept when uninstalling.
+
+The version number comes from `VERSION` in `app.py`.
+
 ### Running on another computer
 
 Copy the whole `dist\viCheck` folder (or `viCheck-win64.zip` and unzip it) and start `viCheck.exe`. Nothing has to be
@@ -31,6 +41,7 @@ installed: Python, Flask and pylabview are inside the folder, and **LabVIEW is n
 - PDF reports are printed by Microsoft Edge (or Google Chrome).
 - The exe is not signed, so Windows SmartScreen may warn on the first start: *More info → Run anyway*.
 - The `.exe` alone does not work: it needs the `_internal` folder next to it.
+- On the first start a short *how to use* window opens; the **?** button at the top shows it again.
 - Settings and cache are kept per user in `%LOCALAPPDATA%\viCheck`; primitive names are read from LabVIEW's
   palettes only if LabVIEW is installed on that computer.
 
@@ -55,8 +66,13 @@ installed: Python, Flask and pylabview are inside the folder, and **LabVIEW is n
     at about 1:1 (LabVIEW's 100 % size), so changes stay readable even when the overview of a large VI is small;
   - Stacked Sequences are shown frame by frame in the PDF by default (unfolded they get very wide and shrink on the
     page); *Stacked Sequence → Flat* is an option.
+  - **Contents** are chosen when the report is made: summary tables, change lists, whole diagram, detail views,
+    other files. For one VI, the export page has the same choices and *↻ Generate again*.
 - **Sidebar**: in a VI comparison the file details at the top fold away with **▴ Hide**, giving the change list more room.
-- **Primitive names**: if LabVIEW is installed, primitive names are read from its palettes on first start.
+- **Primitive names**: VI files store primitives only by number; the names come from the palettes of a LabVIEW
+  installation. On first start viCheck reads them from the newest LabVIEW on the computer. If your VIs were made with
+  another LabVIEW version, or LabVIEW is not installed, import the names from that version's folder on the
+  *Primitive names* page (or name a primitive by double-clicking it on a diagram); otherwise it is shown as `#number`.
 - **Language**: the interface is in English and Turkish; switch with **EN / TR** at the top right, the choice is saved.
   On first start the Windows language is used. Reports and SVG exports are written in the chosen language;
   LabVIEW's own terms (Value Change, Case Structure…) stay in English, as in LabVIEW.
@@ -100,11 +116,6 @@ git add third_party/pylabview
 git commit -m "Update pylabview"
 ```
 
-## Test data
-
-The VIs used during development belong to the JKI State Machine project and are not in the repository.
-`python tools/make_testdata.py` downloads them into `testdata/`; expected results are in `testdata/README.md` (Turkish).
-
 ## Safety
 
 Compared files are only read. Every VI is first copied to a private temporary folder, the copy is checked against the
@@ -128,12 +139,11 @@ i18n.py           interface languages (English source + Turkish translation; rul
 engine/           files.py (scan, hash, registry), lvtypes.py (type table + value decoder), vi_parser, vi_diff, render, svgrender (SVG + detail crops), changelog (report), pdfout (PDF) ...
 docs/             reverse-engineering.md — fields decoded from the VI format, with evidence (Turkish)
 tools/re/         format research scripts (event codes, shortcuts, heap diff, bulk regression)
-tools/make_testdata.py  downloads the test VIs from the JKI repository
 tools/check_i18n.py     checks that every interface text has a translation
 static/, templates/   interface (diagram.js SVG renderer, vidiff.js, vicheck.js)
 third_party/pylabview pylabview fork (git submodule, MIT)
-testdata/         test VIs — not in the repository, created with tools/make_testdata.py
-vicheck.spec, build.bat   exe packaging (PyInstaller, one folder)
+vicheck.spec, build.bat   exe packaging (PyInstaller, one folder) + zip + installer
+installer/viCheck.iss     Inno Setup script for viCheck-Setup-<version>.exe
 ```
 
 License: MIT. pylabview (MIT) is used as a submodule; see THIRD_PARTY_NOTICES.md. LabVIEW is a trademark of National
