@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, status_badge, split_path %}
+{% block title %}{{ la }} ⇄ {{ lb }}{% endblock %}
+{% block crumb %}<span class="crumb">/ folder comparison</span>{% endblock %}
+{% block content %}
+{% set here = request.full_path %}
+<div class="card" style="margin-bottom:16px">
+  <div class="card-body">
+    <div class="pair">
+      <div class="pair-side"><span class="slot-tag a">A</span><a href="#" class="mono" data-reveal="{{ a }}" title="Show in Explorer">{{ a }}</a><span class="faint small">{{ count_a }} files</span></div>
+      <div class="pair-side"><span class="slot-tag b">B</span><a href="#" class="mono" data-reveal="{{ b }}" title="Show in Explorer">{{ b }}</a><span class="faint small">{{ count_b }} files</span></div>
+    </div>
+    <div class="row" style="margin-top:14px;gap:8px">
+      <a class="btn sm" href="{{ url_for('compare', a=b, b=a) }}">⇄ Swap A and B</a>
+      <a class="btn sm" href="{{ url_for('compare', a=a, b=b) }}">↻ Compare again</a>
+      <a class="btn sm" href="{{ url_for('index', a=a, b=b) }}">Change…</a>
+      <span class="grow"></span>
+      <details class="report-box">
+        <summary class="btn sm primary">📄 Report with SVG images…</summary>
+        <form method="post" action="{{ url_for('report_start') }}" class="report-form">
+          <input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="b" value="{{ b }}">
+          <div class="small muted" style="margin-bottom:6px">A Markdown report: summary table, every changed VI with its change list and one SVG with the A and B block diagrams.</div>
+          {% for k, t in categories %}
+          <label class="chk"><input type="checkbox" name="cat" value="{{ k }}" {{ 'checked' if k in default_cats }}> {{ t }}</label>
+          {% endfor %}
+          <button class="btn sm primary" style="margin-top:8px">Generate report</button>
+        </form>
+      </details>
+    </div>
+  </div>
+</div>
+
+<div class="row" style="margin-bottom:8px">
+  <b>{{ changes|length }} file{{ '' if changes|length == 1 else 's' }} differ</b>
+  <span class="small muted">
+    {% if stats.modified %}· <span class="num-mod">{{ stats.modified }} modified</span>{% endif %}
+    {% if stats.added %}· <span class="num-add">{{ stats.added }} only in B</span>{% endif %}
+    {% if stats.deleted %}· <span class="num-del">{{ stats.deleted }} only in A</span>{% endif %}
+    {% if stats.renamed %}· {{ stats.renamed }} moved{% endif %}
+    · {{ same|length }} identical
+  </span>
+  <span class="small muted">· {{ changes|selectattr("is_vi")|list|length }} VI/control:</span>
+  <span class="vi-tally" data-vi-tally>{% if changes|selectattr("is_vi")|list %}<span class="spinner"></span>{% endif %}</span>
+</div>
+{% if not changes %}<div class="card empty"><h2>The folders are identical</h2>All {{ same|length }} files have exactly the same content.</div>{% endif %}
+{% if changes|selectattr("is_vi")|list %}<div class="card" style="margin-bottom:10px"><div class="vi-filter" data-vi-filter="view" style="border-top:0"></div></div>{% endif %}
+{% if changes %}
+<div class="card changes">
+  {% for c in changes %}
+  {% set fa = (a ~ '/' ~ (c.old_path or c.path)) if c.status != 'added' else '' %}
+  {% set fb = (b ~ '/' ~ c.path) if c.status != 'deleted' else '' %}
+  <div class="ch">
+    <div class="ch-row" {% if c.is_vi and c.status != "renamed" %}data-vi-row{% endif %}>
+      {{ status_badge(c.status) }}
+      {{ icon(c.kind) }}
+      <span class="path" title="{{ c.path }}">{% if c.old_path %}<span class="faint">{{ c.old_path }} → </span>{% endif %}{{ split_path(c.path) }}</span>
+      {% if c.status == "added" %}<span class="side-only b">only in B</span>{% elif c.status == "deleted" %}<span class="side-only a">only in A</span>{% endif %}
+      {% if c.is_vi %}
+        {% if c.status != "renamed" %}<span class="vi-sum" data-vi-summary data-old="{{ c.old_sha or '' }}" data-new="{{ c.new_sha or '' }}" data-name="{{ c.path }}"><span class="spinner"></span></span>{% endif %}
+        <a class="btn sm primary" href="{{ url_for('vidiff_view', a=fa, b=fb, ra=a, rb=b, back=here) }}">Block diagram diff →</a>
+      {% elif c.status == "modified" and (is_text_ext(c.path)) %}
+        <button class="btn sm" type="button" data-textdiff="{{ url_for('api_textdiff', a=fa, b=fb) }}" data-target="td{{ loop.index }}">Text diff</button>
+      {% endif %}
+      <span class="faint small" style="min-width:110px;text-align:right">{% if c.status == "modified" %}{{ c.old_size|hsize }} → {{ c.new_size|hsize }}{% elif c.status == "deleted" %}{{ c.old_size|hsize }}{% else %}{{ c.new_size|hsize }}{% endif %}</span>
+      <a class="btn sm ghost" href="#" title="Show in Explorer" data-reveal="{{ fb or fa }}">📂</a>
+    </div>
+    <div id="td{{ loop.index }}" hidden style="border-top:1px solid var(--border);max-height:520px;overflow:auto"></div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% if same %}
+<details class="card same-list">
+  <summary class="card-head"><b>{{ same|length }} identical file{{ '' if same|length == 1 else 's' }}</b><span class="faint small">— byte-for-byte the same in A and B</span></summary>
+  <div class="same-body">
+  {% for c in same %}<div class="same-row">{{ icon(c.kind) }} <span class="path">{{ split_path(c.path) }}</span><span class="faint small">{{ c.new_size|hsize }}</span></div>{% endfor %}
+  </div>
+</details>
+{% endif %}
+{% if rules %}<p class="small faint" style="margin-top:12px">Ignored by your rules: <code>{{ rules|join("  ") }}</code></p>{% endif %}
+{% endblock %}

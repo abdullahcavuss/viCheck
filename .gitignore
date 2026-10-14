@@ -1,0 +1,11 @@
+.venv/
+build/
+dist/
+__pycache__/
+*.py[cod]
+test_out/
+
+# Test VIs belong to the JKI State Machine project (BSD license); not redistributed here.
+# Create them with: python tools/make_testdata.py
+testdata/*
+!testdata/README.md

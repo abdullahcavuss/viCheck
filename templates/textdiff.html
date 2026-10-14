@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}{{ fname }}{% endblock %}
+{% block content %}
+<div class="small"><a href="{{ back_url }}">← Back</a></div>
+<h2 style="margin-top:8px">{{ fname }}</h2>
+<div class="pair" style="margin-bottom:12px">
+  <div class="pair-side"><span class="slot-tag a">A</span><span class="mono">{{ a or "—" }}</span></div>
+  <div class="pair-side"><span class="slot-tag b">B</span><span class="mono">{{ b or "—" }}</span></div>
+</div>
+<div class="card"><div id="td" style="max-height:none"></div></div>
+<button hidden data-textdiff="{{ url_for('api_textdiff', a=a, b=b) }}" data-target="td" id="tdbtn"></button>
+<script>document.addEventListener("DOMContentLoaded", () => document.getElementById("tdbtn").click());</script>
+{% endblock %}

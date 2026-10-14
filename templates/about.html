@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}About{% endblock %}
+{% block content %}
+<div class="card" style="max-width:820px">
+  <div class="card-body">
+    <h1>viCheck <span class="faint small">{{ app_version }}</span></h1>
+    <p>Compares two LabVIEW VIs or two folders of VIs and draws the block diagrams side by side as SVG — without LabVIEW.</p>
+    <table class="kv" style="margin:12px 0">
+      <tr><td>Window</td><td>{{ {"webview": "desktop window (Microsoft Edge WebView2)", "app": "browser app window", "browser": "web browser"}[ui_mode] }}</td></tr>
+      <tr><td>Data folder</td><td><a href="#" data-reveal="{{ data_dir }}" class="mono">{{ data_dir }}</a> <span class="faint">— cache, exports, primitive names</span></td></tr>
+      <tr><td>Safety</td><td>The compared files are only read. Each VI is copied to a private temporary folder and parsed from the copy.</td></tr>
+    </table>
+    <p class="small muted">VI parsing uses <a href="https://github.com/mefistotelis/pylabview" target="_blank">pylabview</a> (MIT). The diff engine and the diagram renderer come from VIVER. viCheck is not affiliated with NI or Emerson; LabVIEW is a trademark of National Instruments Corporation.</p>
+  </div>
+</div>
+{% endblock %}

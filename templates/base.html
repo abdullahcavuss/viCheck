@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Compare{% endblock %} · viCheck</title>
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='vicheck.css') }}">
+{% block head %}{% endblock %}
+</head>
+<body class="{% block bodyclass %}{% endblock %}" data-ui="{{ ui_mode }}">
+<header class="topbar">
+  <a class="brand" href="{{ url_for('index') }}">
+    <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><rect x="4" y="4" width="56" height="56" rx="7" fill="#14181F" stroke="#FFFFFF" stroke-width="3"/><path d="M4 15 V11 A7 7 0 0 1 11 4 H53 A7 7 0 0 1 60 11 V15 Z" fill="#FFFFFF"/><rect x="11" y="21" width="18" height="30" rx="2" fill="none" stroke="#6EA8FF" stroke-width="4"/><rect x="35" y="21" width="18" height="30" rx="2" fill="none" stroke="#E8590C" stroke-width="4"/><path d="M24 37 l6 6 l12 -14" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span><span style="color:#FF7A2F">vi</span>Check</span>
+  </a>
+  {% block crumb %}{% endblock %}
+  <span class="spacer"></span>
+  <nav class="topnav">
+    <a href="{{ url_for('index') }}">New comparison</a>
+    <a href="{{ url_for('primitives_page') }}">Primitive names</a>
+    <a href="{{ url_for('about') }}">About</a>
+    {% if ui_mode != "browser" %}<button type="button" class="topbtn" data-open-browser title="Open this page in your web browser — e.g. to inspect the SVG with the browser's developer tools (F12)">↗ Open in browser</button>{% endif %}
+  </nav>
+</header>
+{% block body %}
+<main class="wrap {% block wrapclass %}{% endblock %}">
+  {% block content %}{% endblock %}
+</main>
+{% endblock %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='vicheck.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

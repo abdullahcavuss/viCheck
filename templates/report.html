@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Report{% endblock %}
+{% block crumb %}<span class="crumb">/ comparison report</span>{% endblock %}
+{% block content %}
+<div class="small"><a href="{{ url_for('compare', a=meta.a, b=meta.b) }}">← Back to the comparison</a></div>
+<div class="row" style="margin:8px 0 14px">
+  <h2 style="margin:0" class="grow">Comparison report</h2>
+  {% if body %}
+  <a class="btn primary" href="{{ url_for('report_zip', jid=meta.id) }}">⬇ ZIP (REPORT.md + SVG images)</a>
+  <button class="btn" type="button" data-reveal="{{ out }}">📂 Open folder</button>
+  {% endif %}
+</div>
+{% if meta.error %}<div class="flash error">Could not generate the report: {{ meta.error }}</div>{% endif %}
+{% if meta.running %}
+<div class="card"><div class="card-body">
+  <div><span class="spinner"></span> <b>Preparing…</b> <span class="muted" id="cl-cur"></span></div>
+  <div class="progress"><div id="cl-bar"></div></div>
+  <p class="hint">Every changed VI is parsed and compared without LabVIEW, and an SVG with both block diagrams is drawn. VIs opened before come from the cache.</p>
+</div></div>
+<script>
+(async function poll() {
+  const j = await (await fetch("{{ url_for('api_report', jid=meta.id) }}")).json();
+  if (!j.running) { location.reload(); return; }
+  document.getElementById("cl-bar").style.width = (j.total ? 100 * j.done / j.total : 4) + "%";
+  document.getElementById("cl-cur").textContent = j.total ? `${j.done}/${j.total} VI — ${j.current || ""}` : "";
+  setTimeout(poll, 700);
+})();
+</script>
+{% elif body %}
+<p class="small muted" style="margin-top:-6px">Saved to <span class="mono">{{ out }}</span></p>
+<article class="card md-body"><div class="card-body">{{ body|safe }}</div></article>
+{% endif %}
+{% endblock %}
