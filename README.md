@@ -1,64 +1,96 @@
-# viCheck — LabVIEW VI / klasör karşılaştırma
+# viCheck — LabVIEW VI / folder comparison
 
-İki VI'ı veya iki klasörü karşılaştırır. Blok diyagramlar LabVIEW **olmadan** çözümlenir ve yan yana **SVG** olarak çizilir. Motor (pylabview + diff + çizim) VIVER projesiyle aynıdır; viCheck sadece karşılaştırma yapar, depo/commit yoktur.
+**English** · [Türkçe](README.tr.md)
 
-## Kurulum — exe üretmek
+Compares two VIs or two folders. Block diagrams are parsed **without LabVIEW** and drawn side by side as **SVG**.
+The engine (pylabview + diff + drawing) is the same as in the VIVER project; viCheck only compares — no repositories or commits.
 
-pylabview bu repoya **git alt modülü** olarak bağlı (bkz. [pylabview](#pylabview)); repoyu alt modülüyle birlikte alın:
+## Installation — building the exe
+
+pylabview is included as a **git submodule** (see [pylabview](#pylabview)); clone the repository with it:
 
 ```
 git clone --recursive https://github.com/abdullahcavuss/viCheck.git
 ```
 
-(`--recursive` olmadan klonladıysanız `git submodule update --init`; `build.bat` / `run.bat` bunu eksikse kendisi de yapar.)
+(If you cloned without `--recursive`, run `git submodule update --init`; `build.bat` / `run.bat` also do this when it is missing.)
 
-1. Bu klasörde **`build.bat`** dosyasına çift tıklayın (yalnızca derleme için Python 3.9+ gerekir).
-2. Bittiğinde: **`dist\viCheck\viCheck.exe`**. Başka bir bilgisayarda kullanmak için `dist\viCheck` klasörünün tamamını kopyalayın; orada Python gerekmez.
+1. Double-click **`build.bat`** in this folder (Python 3.9+ is needed only for building).
+2. Result: **`dist\viCheck\viCheck.exe`**, and the same folder zipped as **`dist\viCheck-win64.zip`**.
 
-Derlemeden denemek için: `run.bat`.
+To try it without building: `run.bat`.
 
-## Kullanım
+### Running on another computer
 
-- **A** (eski) ve **B** (yeni) için VI veya klasör seçin: *Choose VI… / Choose folder…*, yolu yapıştırın ya da dosyayı/klasörü kutuya sürükleyin (iki öğeyi birden bırakırsanız A ve B'ye yerleşir). **Compare**.
-- **İki VI** → blok diyagram diff: değişiklik listesi, yan yana diyagramlar, eklenen/silinen/değişen öğeler renkli. `j`/`k` ile değişiklikler arasında gezinilir.
-- **İki klasör** → dosyalar göreli yollarına göre eşleşir: değişen, yalnızca A'da, yalnızca B'de, taşınan ve aynı dosyalar. Her VI için özet (içerik / görsel-yerleşim / sadece yeniden kaydedilmiş). Metin dosyalarında metin diff'i.
+Copy the whole `dist\viCheck` folder (or `viCheck-win64.zip` and unzip it) and start `viCheck.exe`. Nothing has to be
+installed: Python, Flask and pylabview are inside the folder, and **LabVIEW is not needed**.
+
+- Windows 10 or 11, 64-bit.
+- The window uses Microsoft Edge WebView2, which is part of Windows 11 and of an up-to-date Windows 10. Without it
+  viCheck opens in an Edge/Chrome window or the default browser instead.
+- PDF reports are printed by Microsoft Edge (or Google Chrome).
+- The exe is not signed, so Windows SmartScreen may warn on the first start: *More info → Run anyway*.
+- The `.exe` alone does not work: it needs the `_internal` folder next to it.
+- Settings and cache are kept per user in `%LOCALAPPDATA%\viCheck`; primitive names are read from LabVIEW's
+  palettes only if LabVIEW is installed on that computer.
+
+## Usage
+
+- Choose a VI or a folder for **A** (old) and **B** (new): *Choose VI… / Choose folder…*, paste a path, or drop the file/folder
+  on its box (drop two items at once to fill A and B). **Compare**.
+- **Two VIs** → block diagram diff: list of changes, diagrams side by side, added/removed/modified items in color.
+  `j`/`k` move through the changes.
+- **Two folders** → files are matched by relative path: modified, only in A, only in B, moved, and identical files.
+  A summary for every VI (content / visual-layout / re-saved only). Text diff for text files.
 - **SVG**
-  - Pencere içinde sağ tık → **Inspect** (geliştirici araçları) ile SVG öğelerine bakabilirsiniz; ya da üstteki **↗ Open in browser** ile sayfayı tarayıcıda açıp F12 kullanın.
-  - **⬇ Save view as SVG**: ekranda gördüğünüz A + B görünümünü tek SVG dosyası olarak kaydeder.
-  - **🖼 Export SVG**: A ve B diyagramlarını numaralı değişiklik işaretleriyle SVG dosyalarına çizer (+ README.md).
-  - Klasör karşılaştırmasında **📄 Report with SVG images…**: tüm değişen VI'lar için Markdown raporu + SVG'ler (ZIP olarak da indirilebilir).
-- **Primitive names**: LabVIEW kuruluysa primitive adları ilk açılışta paletlerden otomatik okunur.
+  - Right-click → **Inspect** in the window to look at the SVG elements, or **↗ Open in browser** and use F12.
+  - **⬇ Save view as SVG**: saves the A + B view exactly as shown, as one SVG file.
+  - **🖼 Export SVG**: draws the A and B diagrams with numbered change markers into SVG files (+ README.md).
+  - In a folder comparison, **📄 Report with SVG images…**: a Markdown report with SVGs for every changed VI (also as ZIP).
+- **PDF**: **📄 PDF** in a VI comparison, *Also make a PDF* in a folder report. The PDF is printed by Microsoft Edge,
+  which comes with Windows; the SVGs stay vector graphics (sharp when zoomed, text can be searched). For every VI:
+  - the list of changes and the whole A and B diagram in one image (side by side or one above the other, whichever
+    is drawn larger on the page);
+  - **detail views**: nearby changes are grouped and each group is cropped from the same area of A and B and printed
+    at about 1:1 (LabVIEW's 100 % size), so changes stay readable even when the overview of a large VI is small;
+  - Stacked Sequences are shown frame by frame in the PDF by default (unfolded they get very wide and shrink on the
+    page); *Stacked Sequence → Flat* is an option.
+- **Sidebar**: in a VI comparison the file details at the top fold away with **▴ Hide**, giving the change list more room.
+- **Primitive names**: if LabVIEW is installed, primitive names are read from its palettes on first start.
+- **Language**: the interface is in English and Turkish; switch with **EN / TR** at the top right, the choice is saved.
+  On first start the Windows language is used. Reports and SVG exports are written in the chosen language;
+  LabVIEW's own terms (Value Change, Case Structure…) stay in English, as in LabVIEW.
 
-### Komut satırı / LabVIEW'den çağırma
+### Command line / calling from LabVIEW
 
 ```
-viCheck.exe "C:\eski\Main.vi" "C:\yeni\Main.vi"
-viCheck.exe "C:\proje_v1" "C:\proje_v2"
-viCheck.exe --browser            (pencere yerine varsayılan tarayıcıda açar)
+viCheck.exe "C:\old\Main.vi" "C:\new\Main.vi"
+viCheck.exe "C:\project_v1" "C:\project_v2"
+viCheck.exe --browser            (opens in the default browser instead of the window)
 ```
 
-LabVIEW'den *System Exec.vi* ile aynı komut çağrılabilir.
+The same command can be run from LabVIEW with *System Exec.vi*.
 
-## Neleri okuyabiliyor
+## What it can read
 
-pylabview'in çıkardığı veriye ek olarak viCheck şunları da çözüyor (ayrıntı ve kanıtlar: `docs/reverse-engineering.md`):
-Property/Invoke Node property ve method adları, referans sabitlerinin hedefi, Event Structure çerçevelerinin olay adları
-(`"OK": Value Change`, `<This VI>: Panel Close?`, `Timeout`), Event Data Node alanları, cluster/dizi/path sabitlerinin içeriği,
-kontrollerin klavye kısayolları (Enter/Esc/F1) ve yazı biçimi değişiklikleri. Kesin çözülemeyen olay kodları
-`Mouse Down/Up (#8)` gibi aday adla gösterilir.
+On top of what pylabview extracts, viCheck decodes (details and evidence: `docs/reverse-engineering.md`):
+property and method names of Property/Invoke Nodes, targets of reference constants, event names of Event Structure
+frames (`"OK": Value Change`, `<This VI>: Panel Close?`, `Timeout`), Event Data Node fields, contents of
+cluster/array/path constants, keyboard shortcuts of controls (Enter/Esc/F1) and text format changes. Event codes that
+cannot be identified with certainty are shown with candidate names, e.g. `Mouse Down/Up (#8)`.
 
 ## pylabview
 
-VI dosyalarını okuyan kütüphane, [abdullahcavuss/pylabview](https://github.com/abdullahcavuss/pylabview) fork'unun
-`heap-descriptions` dalından alt modül olarak geliyor (`third_party/pylabview`). Fork, orijinal
-[mefistotelis/pylabview](https://github.com/mefistotelis/pylabview)'e şunları ekliyor:
+The library that reads VI files comes from the `heap-descriptions` branch of the
+[abdullahcavuss/pylabview](https://github.com/abdullahcavuss/pylabview) fork, as a submodule (`third_party/pylabview`).
+The fork adds to the original [mefistotelis/pylabview](https://github.com/mefistotelis/pylabview):
 
-- `--tolerant` seçeneği — tutarsız veri içeren VI'lar da uyarıyla okunur; viCheck pylabview'i hep bununla çağırır
-- iki çökme düzeltmesi
-- çıkarılan heap XML'ine olay ve klavye kısayolu açıklamaları (yorum olarak)
+- the `--tolerant` option — VIs with inconsistent data are still read, with warnings; viCheck always uses it
+- two crash fixes
+- event and keyboard shortcut descriptions in extracted heap XML (as comments)
 
-viCheck'e özgü çözümlemeler (property/method adları, olay çerçeve adları, cluster değerleri, diff) pylabview'de değil,
-`engine/` altında. Fork'u güncellemek için:
+viCheck's own decoding (property/method names, event frame names, cluster values, diff) is not in pylabview but in
+`engine/`. To update the fork:
 
 ```
 cd third_party/pylabview
@@ -68,34 +100,41 @@ git add third_party/pylabview
 git commit -m "Update pylabview"
 ```
 
-## Test verileri
+## Test data
 
-Geliştirmede kullanılan VI'lar JKI State Machine projesine ait ve repoda yok. `python tools/make_testdata.py` ile
-`testdata/` altına indirilir; beklenen sonuçlar `testdata/README.md` içinde.
+The VIs used during development belong to the JKI State Machine project and are not in the repository.
+`python tools/make_testdata.py` downloads them into `testdata/`; expected results are in `testdata/README.md` (Turkish).
 
-## Güvenlik
+## Safety
 
-Karşılaştırılan dosyalar yalnızca okunur. Her VI önce özel bir geçici klasöre kopyalanır, kopya karşılaştırma anındaki hash ile doğrulanır ve pylabview ayrı bir süreçte kopyadan okur. Önbellek, dışa aktarımlar ve primitive adları `%LOCALAPPDATA%\viCheck` altında tutulur (`VICHECK_DATA` ortam değişkeniyle değiştirilebilir).
+Compared files are only read. Every VI is first copied to a private temporary folder, the copy is checked against the
+hash taken at comparison time, and pylabview reads the copy in a separate process. Cache, exports and primitive names
+are kept in `%LOCALAPPDATA%\viCheck` (change with the `VICHECK_DATA` environment variable).
 
-## Pencere
+## Window
 
-viCheck, Windows'un yerleşik **Microsoft Edge WebView2** bileşeniyle kendi penceresinde açılır (pywebview). Arayüz tarayıcıdakiyle aynıdır. WebView2 yoksa Edge/Chrome "uygulama penceresi" modunda, o da yoksa varsayılan tarayıcıda açılır.
+viCheck opens in its own window using Windows' built-in **Microsoft Edge WebView2** (pywebview); the interface is the
+same as in a browser. Without WebView2 it opens as an Edge/Chrome app window, or else in the default browser.
 
-Electron yerine bu yolu seçmemin nedeni şu: VI'ları çözümleyen motor Python'da. Electron'da da Python'u ayrıca paketlemek gerekirdi. Bu yöntemde exe çok daha küçük oluyor ve arayüz yine Chromium tabanlı.
+Why not Electron: the engine that reads VIs is written in Python, and Electron would still need Python bundled next to
+it. This way the exe is much smaller and the interface is still Chromium based.
 
-## Yapı
+## Structure
 
 ```
-vicheck.py        başlatıcı: pencere, komut satırı, --pylabview / --pick yardımcı modları
-app.py            web uygulaması (Flask): karşılaştırma, diff, SVG export, rapor
-engine/           files.py (tarama, hash, kayıt), lvtypes.py (tip tablosu + değer çözücü), vi_parser, vi_diff, render, svgrender, changelog ...
-docs/             reverse-engineering.md — VI formatından ek çözülen alanlar ve kanıtları
-tools/re/         format araştırma betikleri (olay kodları, kısayollar, heap farkı, toplu regresyon)
-tools/make_testdata.py  test VI'larını JKI deposundan indirir
-static/, templates/   arayüz (diagram.js SVG çizici, vidiff.js, vicheck.js)
-third_party/pylabview pylabview fork'u (git alt modülü, MIT)
-testdata/         test VI'ları — repoda yok, tools/make_testdata.py ile oluşturulur
-vicheck.spec, build.bat   exe paketleme (PyInstaller, tek klasör)
+vicheck.py        launcher: window, command line, --pylabview / --pick helper modes
+app.py            web application (Flask): comparison, diff, SVG export, report
+i18n.py           interface languages (English source + Turkish translation; rules for engine texts)
+engine/           files.py (scan, hash, registry), lvtypes.py (type table + value decoder), vi_parser, vi_diff, render, svgrender (SVG + detail crops), changelog (report), pdfout (PDF) ...
+docs/             reverse-engineering.md — fields decoded from the VI format, with evidence (Turkish)
+tools/re/         format research scripts (event codes, shortcuts, heap diff, bulk regression)
+tools/make_testdata.py  downloads the test VIs from the JKI repository
+tools/check_i18n.py     checks that every interface text has a translation
+static/, templates/   interface (diagram.js SVG renderer, vidiff.js, vicheck.js)
+third_party/pylabview pylabview fork (git submodule, MIT)
+testdata/         test VIs — not in the repository, created with tools/make_testdata.py
+vicheck.spec, build.bat   exe packaging (PyInstaller, one folder)
 ```
 
-Lisans: MIT. pylabview (MIT) alt modül olarak kullanılır; bkz. THIRD_PARTY_NOTICES.md. LabVIEW, National Instruments Corporation'ın ticari markasıdır.
+License: MIT. pylabview (MIT) is used as a submodule; see THIRD_PARTY_NOTICES.md. LabVIEW is a trademark of National
+Instruments Corporation.

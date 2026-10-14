@@ -1,6 +1,7 @@
 /* VIVER general page behavior */
 (function () {
   "use strict";
+  const T = window.T || ((s, kw) => { let r = s; if (kw) for (const k in kw) r = r.split("{" + k + "}").join(kw[k]); return r; });
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   const store = {
     get(k, d) { try { return localStorage.getItem(k) ?? d; } catch (e) { return d; } },
@@ -36,7 +37,7 @@
     document.querySelectorAll("form[data-confirm]").forEach(f => f.addEventListener("submit", ev => { if (!confirm(f.dataset.confirm)) ev.preventDefault(); }));
 
     // ---- VI diff summaries (changes / commit / compare pages)
-    const LEVEL_TXT = { functional: "Content changed", layout: "Visual/layout", saved: "Re-saved only" };
+    const LEVEL_TXT = { functional: T("Content changed"), layout: T("Visual/layout"), saved: T("Re-saved only") };
     const queue = [...document.querySelectorAll("[data-vi-summary]")];
     const tally = { functional: 0, layout: 0, saved: 0, error: 0 };
     let running = 0;
@@ -46,7 +47,7 @@
       if (!g) {
         g = document.createElement("details");
         g.className = "saved-group";
-        g.innerHTML = '<summary><span class="sg-title"></span><span class="faint small"> — content unchanged (only revision / compiled code / internal numbers differ).</span></summary><div class="sg-body"></div>';
+        g.innerHTML = '<summary><span class="sg-title"></span><span class="faint small">' + esc(T(" — content unchanged (only revision / compiled code / internal numbers differ).")) + '</span></summary><div class="sg-body"></div>';
         card.appendChild(g);
       }
       return g;
@@ -55,19 +56,19 @@
       const t = document.querySelector("[data-vi-tally]");
       if (t) {
         const parts = [];
-        if (tally.functional) parts.push(`<span class="lv functional">${tally.functional} VI content</span>`);
-        if (tally.layout) parts.push(`<span class="lv layout">${tally.layout} VI visual/layout</span>`);
-        if (tally.saved) parts.push(`<span class="lv saved">${tally.saved} VI re-saved only</span>`);
-        if (tally.error) parts.push(`<span class="lv functional">${tally.error} VI unreadable</span>`);
+        if (tally.functional) parts.push(`<span class="lv functional">${T("{n} VI content", { n: tally.functional })}</span>`);
+        if (tally.layout) parts.push(`<span class="lv layout">${T("{n} VI visual/layout", { n: tally.layout })}</span>`);
+        if (tally.saved) parts.push(`<span class="lv saved">${T("{n} VI re-saved only", { n: tally.saved })}</span>`);
+        if (tally.error) parts.push(`<span class="lv functional">${T("{n} VI unreadable", { n: tally.error })}</span>`);
         t.innerHTML = parts.join(" ");
       }
-      document.querySelectorAll(".saved-group .sg-title").forEach(el => { const n = el.closest(".saved-group").querySelectorAll("[data-vi-row]").length; el.textContent = `${n} VI${n === 1 ? "" : "s"} re-saved only`; });
+      document.querySelectorAll(".saved-group .sg-title").forEach(el => { const n = el.closest(".saved-group").querySelectorAll("[data-vi-row]").length; el.textContent = T("{n} VIs re-saved only", { n }); });
     }
     function render(elx, s) {
       const row = elx.closest("[data-vi-row]");
       if (s.error || (s.errors && s.errors.length && s.level !== "functional")) {
         const msg = s.error || s.errors.join(" | ");
-        elx.innerHTML = `<span class="lv functional" title="${esc(msg)}">⚠ unreadable</span><span class="small faint" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(msg)}</span>`;
+        elx.innerHTML = `<span class="lv functional" title="${esc(msg)}">${T("⚠ unreadable")}</span><span class="small faint" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(msg)}</span>`;
         tally.error++; updateTally(); return;
       }
       const lv = s.level || "functional";
@@ -76,7 +77,7 @@
       if (lv === "saved") {
         if (row) row.dataset.cats = "saved";
         const ver = (s.parts || []).find(p => p.key === "version");
-        elx.innerHTML = `<span class="lv saved">re-saved only</span>` + (ver ? `<span class="small faint">LabVIEW ${esc(ver.detail)}</span>` : "");
+        elx.innerHTML = `<span class="lv saved">${T("re-saved only")}</span>` + (ver ? `<span class="small faint">LabVIEW ${esc(ver.detail)}</span>` : "");
         if (row && row.dataset.viRow !== "keep") savedGroup(row).querySelector(".sg-body").appendChild(row);
         updateTally();
         applyFilter();
@@ -92,7 +93,7 @@
       let h = "";
       for (const p of parts) {
         if (!on(p)) continue;
-        if (p.key === "version") { h += `<span class="part saved" title="LabVIEW version">LV ${esc(p.detail)}</span>`; continue; }
+        if (p.key === "version") { h += `<span class="part saved" title="${esc(T("LabVIEW version"))}">LV ${esc(p.detail)}</span>`; continue; }
         h += `<span class="part ${p.level}" title="${esc(p.detail || p.label)}">${esc(p.label)}${p.detail && p.key === "bd" ? ` <b>${esc(p.detail.split(" · ")[0])}</b>` : ""}</span>`;
       }
       elx.innerHTML = h || `<span class="lv ${lv}">${LEVEL_TXT[lv]}</span>`;
@@ -105,9 +106,9 @@
     }
 
     // ---- category filter
-    const CATS = [["logic", "Block diagram logic"], ["bd_layout", "Block diagram layout"], ["fp", "Front panel"],
-                  ["auto", "Timed Loop / XNode internal settings"],
-                  ["other", "Other (icon, description, settings)"], ["saved", "Re-saved only"]];
+    const CATS = [["logic", T("Block diagram logic")], ["bd_layout", T("Block diagram layout")], ["fp", T("Front panel")],
+                  ["auto", T("Timed Loop / XNode internal settings")],
+                  ["other", T("Other (icon, description, settings)")], ["saved", T("Re-saved only")]];
     let FILTER = {};
     try { FILTER = JSON.parse(store.get("viver.filter", "{}")) || {}; } catch (e) { FILTER = {}; }
     // default: everything on, only "auto" (settings LabVIEW regenerates by itself) off
@@ -135,10 +136,10 @@
       }
     }
     document.querySelectorAll("[data-vi-filter]").forEach(box => {
-      box.innerHTML = '<span class="small muted">Show:</span>' + CATS.map(([k, t]) =>
+      box.innerHTML = '<span class="small muted">' + T("Show:") + '</span>' + CATS.map(([k, t]) =>
         `<label class="chip ${isOn(k) ? "on" : ""}"><input type="checkbox" data-cat="${k}" ${isOn(k) ? "checked" : ""} hidden>${t}</label>`).join("") +
         (box.dataset.viFilter === "commit" ? ' <span class="small muted" data-filter-info hidden>· <b>0</b> file(s) hidden <button type="button" class="btn sm" data-uncheck-hidden>Exclude hidden files from the commit</button></span>'
-                                            : ' <span class="small muted" data-filter-info hidden>· <b>0</b> VI(s) hidden</span>');
+                                            : ' <span class="small muted" data-filter-info hidden>· ' + T("{n} VI(s) hidden", { n: "<b>0</b>" }) + '</span>');
       box.querySelectorAll("input[data-cat]").forEach(cb => cb.addEventListener("change", () => {
         FILTER[cb.dataset.cat] = cb.checked;
         cb.parentElement.classList.toggle("on", cb.checked);
@@ -160,7 +161,7 @@
         running++;
         const p = new URLSearchParams({ old: elx.dataset.old || "", new: elx.dataset.new || "", name: elx.dataset.name || "x.vi" });
         fetch("/api/visummary?" + p).then(r => r.json()).then(s => render(elx, s))
-          .catch(e => render(elx, { error: "server error" }))
+          .catch(e => render(elx, { error: T("server error") }))
           .finally(() => { running--; next(); });
       }
     }
@@ -178,7 +179,7 @@
         if (row.t === "hunk") h += `<tr class="hunk"><td colspan="3">${esc(row.text)}</td></tr>`;
         else h += `<tr class="${row.t}"><td class="ln">${row.o || ""}</td><td class="ln">${row.n || ""}</td><td>${row.t === "add" ? "+" : row.t === "del" ? "−" : " "} ${esc(row.text)}</td></tr>`;
       }
-      if (!r.rows.length) h += '<tr><td style="padding:10px" class="muted">No text differences.</td></tr>';
+      if (!r.rows.length) h += '<tr><td style="padding:10px" class="muted">' + esc(T("No text differences.")) + '</td></tr>';
       box.innerHTML = h + "</table>";
       box.dataset.loaded = "1";
     }));

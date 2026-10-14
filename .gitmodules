@@ -1,7 +1,3 @@
-[submodule "pylabview"]
-	path = pylabview
-	url = https://github.com/abdullahcavuss/pylabview.git
-	branch = heap-descriptions
 [submodule "third_party/pylabview"]
 	path = third_party/pylabview
 	url = https://github.com/abdullahcavuss/pylabview.git

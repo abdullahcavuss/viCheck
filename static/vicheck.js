@@ -1,6 +1,7 @@
 /* viCheck page behavior: path slots, native pickers, drag & drop, Explorer, SVG saving */
 (function () {
   "use strict";
+  const T = window.T || ((s, kw) => { let r = s; if (kw) for (const k in kw) r = r.split("{" + k + "}").join(kw[k]); return r; });
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   const inWebview = () => !!(window.pywebview && window.pywebview.api && window.pywebview.api.pick);
 
@@ -25,12 +26,19 @@
 
   async function reveal(path) {
     const r = await fetch("/api/reveal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) });
-    if (!r.ok) toast("⚠ Could not open: " + esc(path));
+    if (!r.ok) toast(esc(T("⚠ Could not open:")) + " " + esc(path));
   }
 
   document.addEventListener("click", ev => {
     const rv = ev.target.closest("[data-reveal]");
     if (rv) { ev.preventDefault(); reveal(rv.dataset.reveal); return; }
+    const of = ev.target.closest("[data-open-file]");
+    if (of) {
+      ev.preventDefault();
+      fetch("/api/open-file", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: of.dataset.openFile }) })
+        .then(r => { if (!r.ok) toast(esc(T("⚠ Could not open:")) + " " + esc(of.dataset.openFile)); });
+      return;
+    }
     const ob = ev.target.closest("[data-open-browser]");
     if (ob) {
       ev.preventDefault();
@@ -53,23 +61,23 @@
       const slot = slots[side];
       const kindEl = slot.querySelector("[data-kind]"), hintEl = slot.querySelector("[data-hint]"), iconEl = slot.querySelector("[data-icon]");
       slot.classList.remove("ok", "bad");
-      if (!v) { info[side] = null; kindEl.textContent = ""; hintEl.textContent = "Drop a VI or a folder here"; iconEl.innerHTML = ICON_VI; update(); return; }
+      if (!v) { info[side] = null; kindEl.textContent = ""; hintEl.textContent = T("Drop a VI or a folder here"); iconEl.innerHTML = ICON_VI; update(); return; }
       try {
         const j = await (await fetch("/api/kind?" + new URLSearchParams({ path: v }))).json();
         if (inputs[side].value.trim() !== v) return;
         info[side] = j;
-        if (!j.kind) { slot.classList.add("bad"); kindEl.textContent = "not found"; hintEl.textContent = "This path does not exist"; }
-        else if (j.kind === "folder") { slot.classList.add("ok"); kindEl.textContent = "folder"; iconEl.innerHTML = ICON_DIR; hintEl.innerHTML = `<b>${j.vis}</b> VI/control in <b>${j.files}</b> files`; }
-        else { slot.classList.add("ok"); kindEl.textContent = j.is_vi ? "VI" : "file"; iconEl.innerHTML = ICON_VI; hintEl.innerHTML = `${esc(j.path.split(/[\\/]/).pop())} · ${j.size}`; }
+        if (!j.kind) { slot.classList.add("bad"); kindEl.textContent = T("not found"); hintEl.textContent = T("This path does not exist"); }
+        else if (j.kind === "folder") { slot.classList.add("ok"); kindEl.textContent = T("folder"); iconEl.innerHTML = ICON_DIR; hintEl.innerHTML = T("{vis} VI/control in {files} files", { vis: `<b>${j.vis}</b>`, files: `<b>${j.files}</b>` }); }
+        else { slot.classList.add("ok"); kindEl.textContent = j.is_vi ? "VI" : T("file"); iconEl.innerHTML = ICON_VI; hintEl.innerHTML = `${esc(j.path.split(/[\\/]/).pop())} · ${j.size}`; }
       } catch (e) { info[side] = null; }
       update();
     }
     function update() {
       const a = info.a, b = info.b;
       let msg = "";
-      if (a && b && a.kind && b.kind && a.kind !== b.kind) msg = "⚠ A and B must both be files or both be folders.";
-      else if (a && b && a.kind === "folder" && b.kind === "folder") msg = "Folder comparison: every file is matched by its path.";
-      else if (a && b && a.kind === "file" && b.kind === "file") msg = "Block diagram diff of the two VIs.";
+      if (a && b && a.kind && b.kind && a.kind !== b.kind) msg = T("⚠ A and B must both be files or both be folders.");
+      else if (a && b && a.kind === "folder" && b.kind === "folder") msg = T("Folder comparison: every file is matched by its path.");
+      else if (a && b && a.kind === "file" && b.kind === "file") msg = T("Block diagram diff of the two VIs.");
       hint.textContent = msg;
     }
     let tmr = {};
@@ -87,7 +95,7 @@
         if (!inWebview()) {
           const txt = e.dataTransfer.getData("text/plain");
           if (txt && /^([a-zA-Z]:\\|\\\\|\/)/.test(txt.trim())) { inputs[side].value = txt.trim(); check(side); }
-          else toast("Drag & drop of files works in the viCheck window. In a browser, use <b>Choose VI…</b> / <b>Choose folder…</b> or paste the path.");
+          else toast(T("Drag & drop of files works in the viCheck window. In a browser, use <b>Choose VI…</b> / <b>Choose folder…</b> or paste the path."));
         }
       });
     }
@@ -113,11 +121,11 @@
       check("a"); check("b");
     });
     form.addEventListener("submit", ev => {
-      if (!inputs.a.value.trim() || !inputs.b.value.trim()) { ev.preventDefault(); toast("Choose both A and B."); return; }
+      if (!inputs.a.value.trim() || !inputs.b.value.trim()) { ev.preventDefault(); toast(esc(T("Choose both A and B."))); return; }
       const btn = document.getElementById("go");
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Comparing…';
-      setTimeout(() => { btn.disabled = false; btn.textContent = "Compare"; }, 15000);
+      btn.innerHTML = '<span class="spinner"></span> ' + esc(T("Comparing…"));
+      setTimeout(() => { btn.disabled = false; btn.textContent = T("Compare"); }, 15000);
     });
   }
 
@@ -154,13 +162,24 @@
     const out = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><style>${SVG_STYLE}</style><rect width="100%" height="100%" fill="#ffffff"/>${inner}</svg>`;
     const r = await fetch("/api/save-svg", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: root.dataset.fname, svg: out }) });
     const j = await r.json();
-    if (j.path) toast(`✓ Saved <span class="mono">${esc(j.path)}</span><br><a href="#" data-reveal="${esc(j.path)}">Show in folder</a> · <a href="${esc(j.url)}" target="_blank">Open</a>`, 12000);
-    else toast("⚠ " + esc(j.error || "Could not save"));
+    if (j.path) toast(`${esc(T("✓ Saved"))} <span class="mono">${esc(j.path)}</span><br><a href="#" data-reveal="${esc(j.path)}">${esc(T("Show in folder"))}</a> · <a href="${esc(j.url)}" target="_blank">${esc(T("Open"))}</a>`, 12000);
+    else toast("⚠ " + esc(j.error || T("Could not save")));
   }
 
   document.addEventListener("DOMContentLoaded", () => {
     const f = document.getElementById("cmp-form");
     if (f) initHome(f);
+    const tg = document.querySelector("[data-head-toggle]");
+    if (tg) {
+      const side = tg.closest(".vd-side");
+      let closed = false;
+      try { closed = localStorage.getItem("vicheck.headClosed") === "1"; } catch (e) { /* no storage */ }
+      side.classList.toggle("head-closed", closed);
+      tg.addEventListener("click", () => {
+        closed = !side.classList.toggle("head-closed") ? false : true;
+        try { localStorage.setItem("vicheck.headClosed", closed ? "1" : "0"); } catch (e) { /* no storage */ }
+      });
+    }
     const sv = document.querySelector("[data-svg-copy]");
     if (sv) sv.addEventListener("click", saveView);
   });

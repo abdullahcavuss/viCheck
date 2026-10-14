@@ -4,6 +4,7 @@ viCheck — compare two LabVIEW VIs or two folders of VIs, with block diagram di
 This module is the web application. Start the program with vicheck.py (or viCheck.exe),
 which opens it in a desktop window.
 """
+import copy
 import datetime
 import difflib
 import io
@@ -27,8 +28,9 @@ from engine.files import (LocalStore, CompareError, diff_trees, file_kind, human
 from engine.service import VIService  # noqa: E402
 from engine import palettes, mdlite, pylv  # noqa: E402
 from engine import changelog as report_mod  # noqa: E402
-from engine import svgrender  # noqa: E402
+from engine import svgrender, pdfout  # noqa: E402
 from engine.vi_diff import CATEGORIES  # noqa: E402
+import i18n  # noqa: E402
 
 APP_NAME = "viCheck"
 VERSION = "1.0.0"
@@ -60,16 +62,79 @@ app.jinja_env.globals["is_vi"] = is_vi
 app.jinja_env.globals["is_text_ext"] = lambda p: is_text(p)
 
 
+# ------------------------------------------------------------------ language
+def get_lang():
+    """Chosen language: saved setting, else cookie, else the browser/Windows language."""
+    try:
+        lang = store.settings().get("lang") or request.cookies.get("lang")
+        if lang in i18n.LANGS:
+            return lang
+        return i18n.detect(request.headers.get("Accept-Language"))
+    except RuntimeError:   # outside a request (background jobs)
+        return store.settings().get("lang") or i18n.DEFAULT
+
+
+def _(text, **values):
+    return i18n.translate(text, get_lang(), **values)
+
+
+def _n(singular, plural, n, **values):
+    return i18n.plural(singular, plural, n, get_lang(), **values)
+
+
+_DYN = None
+
+
+def translate_message(msg, lang=None):
+    """Translates a message that was built from a template key, e.g. 'Not found: C:\\x' (error texts)."""
+    global _DYN
+    lang = lang or get_lang()
+    if lang == "en" or not msg:
+        return msg
+    if msg in i18n.TR:
+        return i18n.TR[msg]
+    if _DYN is None:
+        _DYN = []
+        for key in i18n.TR:
+            if "{" in key:
+                rx = "^" + re.sub(r"\\\{(\w+)\\\}", lambda m: "(?P<%s>.+?)" % m.group(1), re.escape(key)) + "$"
+                try:
+                    _DYN.append((re.compile(rx, re.S), key))
+                except re.error:
+                    pass
+    for rx, key in _DYN:
+        m = rx.match(msg)
+        if m:
+            return i18n.TR[key].format(**m.groupdict())
+    return msg
+
+
 @app.context_processor
 def inject_globals():
-    return {"app_name": APP_NAME, "app_version": VERSION, "ui_mode": UI["mode"]}
+    lang = get_lang()
+    return {"app_name": APP_NAME, "app_version": VERSION, "ui_mode": UI["mode"], "lang": lang,
+            "langs": i18n.LANGS, "_": _, "_n": _n, "i18n_js": json.dumps(i18n.js_table(lang), ensure_ascii=False)}
+
+
+@app.route("/lang/<code>")
+def set_lang(code):
+    if code not in i18n.LANGS:
+        abort(404)
+    store.save_settings(lang=code)
+    nxt = request.args.get("next") or "/"
+    if not nxt.startswith("/"):
+        nxt = "/"
+    resp = redirect(nxt)
+    resp.set_cookie("lang", code, max_age=10 * 365 * 24 * 3600, samesite="Lax")
+    return resp
 
 
 @app.errorhandler(CompareError)
 def handle_compare_error(e):
+    msg = translate_message(str(e))
     if request.path.startswith("/api/"):
-        return jsonify({"error": str(e)}), 400
-    return render_template("home.html", error=str(e), a=request.args.get("a", ""), b=request.args.get("b", ""),
+        return jsonify({"error": msg}), 400
+    return render_template("home.html", error=msg, a=request.args.get("a", ""), b=request.args.get("b", ""),
                            recent=store.recent(), settings=store.settings(), default_ignore=DEFAULT_IGNORE), 400
 
 
@@ -126,16 +191,17 @@ def clear_recent():
 def compare():
     a, b = clean_path(request.args.get("a")), clean_path(request.args.get("b"))
     if not a or not b:
-        raise CompareError("Choose two VIs or two folders to compare.")
+        raise CompareError(_("Choose two VIs or two folders to compare."))
     ka, kb = kind_of(a), kind_of(b)
     if ka is None:
-        raise CompareError("Not found: " + a)
+        raise CompareError(_("Not found: {path}", path=a))
     if kb is None:
-        raise CompareError("Not found: " + b)
+        raise CompareError(_("Not found: {path}", path=b))
     if ka != kb:
-        raise CompareError("Both sides must be of the same kind: two files or two folders (A is a %s, B is a %s)." % (ka, kb))
+        raise CompareError(_("Both sides must be of the same kind: two files or two folders (A is a {a}, B is a {b}).",
+                              a=_(ka), b=_(kb)))
     if os.path.normcase(a) == os.path.normcase(b):
-        raise CompareError("A and B are the same %s." % ka)
+        raise CompareError(_("A and B are the same {kind}.", kind=_(ka)))
     store.add_recent(a, b, ka)
     if ka == "file":
         return redirect(url_for("vidiff_view", a=a, b=b))
@@ -165,7 +231,7 @@ def vidiff_view():
         abort(404)
     for p in (a, b):
         if p and not os.path.isfile(p):
-            raise CompareError("File not found: " + p)
+            raise CompareError(_("File not found: {path}", path=p))
     old_sha = store.register(a) if a else None
     new_sha = store.register(b) if b else None
     fname = os.path.basename(b or a)
@@ -177,8 +243,8 @@ def vidiff_view():
     if back and not back.startswith("/"):
         back = ""
     return render_template("vidiff.html", a=a, b=b, old_sha=old_sha, new_sha=new_sha, fname=fname,
-                           old_label=rel_a if a else "(no file)", new_label=rel_b if b else "(no file)",
-                           back_url=back or url_for("index", a=a, b=b), back_label="Back to the comparison" if back else "New comparison",
+                           old_label=rel_a if a else _("(no file)"), new_label=rel_b if b else _("(no file)"),
+                           back_url=back or url_for("index", a=a, b=b), back_label=_("Back to the comparison") if back else _("New comparison"),
                            ra=ra, rb=rb)
 
 
@@ -193,11 +259,12 @@ def api_vidiff():
     new = request.args.get("new") or None
     for s in (old, new):
         if s and (len(s) != 64 or not all(ch in "0123456789abcdef" for ch in s) or not store.has(s)):
-            return jsonify({"error": "Unknown file. Reload the page to scan the files again."}), 400
+            return jsonify({"error": _("Unknown file. Reload the page to scan the files again.")}), 400
     try:
         d = vis.diff(old, new, request.args.get("name", "x.vi"))
     except CompareError as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": translate_message(str(e))}), 400
+    d = i18n.localize_diff(copy.deepcopy(d), get_lang())
     return Response(json.dumps(d, ensure_ascii=False), mimetype="application/json")
 
 
@@ -207,9 +274,9 @@ def api_visummary():
     new = request.args.get("new") or None
     for s in (old, new):
         if s and not store.has(s):
-            return jsonify({"error": "Unknown file — run the comparison again."}), 400
+            return jsonify({"error": _("Unknown file — run the comparison again.")}), 400
     try:
-        return jsonify(vis.summary(old, new, request.args.get("name", "x.vi")))
+        return jsonify(i18n.localize_summary(vis.summary(old, new, request.args.get("name", "x.vi")), get_lang()))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -258,6 +325,13 @@ def _slug(s):
 def export_svg():
     """Draws the old and new block diagram into SVG files (one per view) and shows them."""
     a, b = clean_path(request.args.get("a")), clean_path(request.args.get("b"))
+    def flag(k, default):   # a checkbox after a hidden "0" field: the last value wins
+        v = request.args.getlist(k)
+        return v[-1] == "1" if v else default
+    want_pdf = flag("pdf", False)
+    # PDF: Stacked Sequences frame by frame (unfolded they make very wide, tiny pages); SVG: as in the viewer
+    flat = flag("flat", not want_pdf)
+    details = flag("details", True)
     old_sha = store.register(a) if a else None
     new_sha = store.register(b) if b else None
     name = os.path.basename(b or a)
@@ -270,9 +344,10 @@ def export_svg():
     item = {"c": {"path": name, "status": status, "old_sha": old_sha, "new_sha": new_sha},
             "d": d, "verdict": d["diff"].get("verdict") or {"level": "functional", "parts": []},
             "parts": (d["diff"].get("verdict") or {}).get("parts", []),
-            "base_short": "A", "head_short": "B"}
+            "base_short": "A", "head_short": "B", "old_title": "A", "new_title": "B"}
     cats = set(c for c, _ in CATEGORIES)
-    lines = report_mod._vi_section(item, out, store.prim_names(), False, cats)
+    lang = get_lang()
+    lines = report_mod._vi_section(item, out, store.prim_names(), False, cats, flat=flat, details=details)
     img_dir = os.path.join(out, report_mod.IMG_DIR)
     svgs = sorted(f for f in os.listdir(img_dir) if f.endswith(".svg")) if os.path.isdir(img_dir) else []
     if not svgs:
@@ -284,18 +359,26 @@ def export_svg():
             views = svgrender.render_pair(old_bd if old_bd and old_bd.get("nodes") else None, {}, [],
                                           new_bd if new_bd and new_bd.get("nodes") else None, {}, [],
                                           os.path.join(img_dir, report_mod.slug(name)), store.prim_names(),
-                                          old_title="Previous version (A)", new_title="New version (B)")
+                                          old_title="A", new_title="B", flat=flat)
             for v in views:
                 rel = os.path.relpath(v["file"], out).replace(os.sep, "/").replace(" ", "%20")
                 lines += ["**Block diagrams of A and B** _(no block diagram changes to mark)_", "",
                           "[![%s](%s)](%s)" % (name, rel, rel), ""]
             svgs = sorted(f for f in os.listdir(img_dir) if f.endswith(".svg"))
-    md = "# %s\n\n**A:** `%s`  \n**B:** `%s`\n\n" % (name, a or "—", b or "—") + "\n".join(lines[2:])
+    section = i18n.report_markdown("\n".join(lines[2:]), lang)
+    md = "# %s\n\n**A:** `%s`  \n**B:** `%s`\n\n" % (name, a or "—", b or "—") + section
     with open(os.path.join(out, "README.md"), "w", encoding="utf-8") as f:
         f.write(md)
-    body = mdlite.render("\n".join(lines[2:]), url_for("export_file", jid=jid, fpath=""))
+    pdf, pdf_error = None, None
+    if want_pdf:
+        try:
+            pdf = pdfout.make_pdf(md, out, report_mod.slug(name) + ".pdf", name, lang)
+        except Exception as e:
+            pdf_error = str(e)
+    body = mdlite.render(section, url_for("export_file", jid=jid, fpath=""))
     return render_template("export.html", jid=jid, name=name, a=a, b=b, svgs=svgs, out=out, body=body,
-                           back=url_for("vidiff_view", a=a, b=b))
+                           back=url_for("vidiff_view", a=a, b=b), pdf=pdf, pdf_error=pdf_error,
+                           opts={"pdf": want_pdf, "flat": flat, "details": details})
 
 
 @app.route("/api/save-svg", methods=["POST"])
@@ -339,9 +422,9 @@ class _ReportStore:
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
         self.commits = {
             "A": {"id": "A", "short": "A", "title": a, "time": now, "tree": ta, "parent": None, "branch": "-",
-                  "author": "", "body": ""},
+                  "author": "", "body": "", "image_title": "A"},
             "B": {"id": "B", "short": "B", "title": b, "time": now, "tree": tb, "parent": "A", "branch": "-",
-                  "author": "", "body": ""},
+                  "author": "", "body": "", "image_title": "B"},
         }
 
     def get_commit(self, repo, ref):
@@ -361,14 +444,19 @@ report_mod.commits_between = lambda *a, **k: []   # folders have no commit histo
 def report_start():
     a, b = clean_path(request.form.get("a")), clean_path(request.form.get("b"))
     if kind_of(a) != "folder" or kind_of(b) != "folder":
-        raise CompareError("A report can be made for two folders.")
+        raise CompareError(_("A report can be made for two folders."))
     cats = request.form.getlist("cat") or list(report_mod.DEFAULT_CATS)
+    want_pdf = request.form.get("pdf") == "1"
+    flat = request.form.get("flat") == "1"
+    details = request.form.get("details") == "1"
     jid = "report-" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     out = os.path.join(store.export_dir, jid)
     os.makedirs(out, exist_ok=True)
     meta = {"id": jid, "a": a, "b": b, "running": True, "done": 0, "total": 0, "current": "", "error": None,
-            "result": None, "cats": cats, "out": out}
+            "result": None, "cats": cats, "out": out, "pdf": None, "pdf_error": None,
+            "opts": {"pdf": want_pdf, "flat": flat, "details": details}}
     REPORTS[jid] = meta
+    lang = get_lang()   # the worker thread has no request
 
     def run():
         try:
@@ -378,17 +466,25 @@ def report_start():
 
             def prog(d, t, cur):
                 meta.update(done=d, total=t, current=cur)
-            meta["result"] = report_mod.generate(rs, vis, {"name": "viCheck"}, "A", "B", out, progress=prog, cats=cats)
+            meta["result"] = report_mod.generate(rs, vis, {"name": "viCheck"}, "A", "B", out, progress=prog, cats=cats,
+                                                 flat=flat, details=details)
             md_path = os.path.join(out, "CHANGELOG.md")
             with open(md_path, encoding="utf-8") as f:
                 md = f.read()
             body = md[md.index("## Summary"):] if "## Summary" in md else md
-            head = ("# viCheck comparison report\n\n**A:** `%s`  \n**B:** `%s`  \n**Generated:** %s · viCheck %s  \n**Scope:** %s\n\n"
-                    % (a, b, datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), VERSION,
-                       ", ".join(t for k, t in CATEGORIES if k in cats)))
+            head = i18n.REPORT_HEAD[lang].format(
+                a=a, b=b, now=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), ver=VERSION,
+                scope=", ".join(i18n.translate(t, lang) for k, t in CATEGORIES if k in cats))
+            report_md = head + i18n.report_markdown(body, lang)
             with open(os.path.join(out, "REPORT.md"), "w", encoding="utf-8") as f:
-                f.write(head + body.replace("Previous version", "A").replace("New version", "B"))
+                f.write(report_md)
             os.remove(md_path)
+            if want_pdf:
+                meta["current"] = "PDF…"
+                try:
+                    meta["pdf"] = pdfout.make_pdf(report_md, out, "REPORT.pdf", "viCheck", lang)
+                except Exception as e:
+                    meta["pdf_error"] = str(e)
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -508,6 +604,25 @@ def api_reveal():
     return jsonify({"ok": True})
 
 
+@app.route("/api/open-file", methods=["POST"])
+def api_open_file():
+    """Opens a generated file (the PDF) with its default application. Only files under the export folder."""
+    p = os.path.realpath(clean_path((request.get_json(silent=True) or {}).get("path")) or "")
+    base = os.path.realpath(store.export_dir)
+    if not p.startswith(base + os.sep) or not os.path.isfile(p):
+        return jsonify({"ok": False, "error": "Not found"}), 404
+    try:
+        if os.name == "nt":
+            os.startfile(p)  # noqa
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", p])
+        else:
+            subprocess.Popen(["xdg-open", p])
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    return jsonify({"ok": True})
+
+
 @app.route("/api/open-browser", methods=["POST"])
 def api_open_browser():
     """Opens a page of the app in the default browser (e.g. to inspect the SVG with its developer tools)."""
@@ -552,7 +667,7 @@ def primitives_page():
     if request.method == "POST":
         path = (request.form.get("lv_dir") or "").strip()
         if not path or not os.path.isdir(path):
-            raise CompareError("LabVIEW folder not found: " + path)
+            raise CompareError(_("LabVIEW folder not found: {path}", path=path))
         start_prim_import(path)
         return redirect(url_for("primitives_page"))
     rows = sorted(store.prim_name_rows(), key=lambda r: int(r["res_id"]) if r["res_id"].isdigit() else 0)

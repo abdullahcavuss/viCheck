@@ -13,9 +13,11 @@ if not exist ".venv\Scripts\python.exe" (
 ".venv\Scripts\python.exe" -m pip install --upgrade pip >nul
 ".venv\Scripts\python.exe" -m pip install -r requirements.txt pyinstaller || (pause & exit /b 1)
 ".venv\Scripts\python.exe" -m PyInstaller vicheck.spec --noconfirm --clean || (pause & exit /b 1)
+echo Zipping dist\viCheck-win64.zip ...
+powershell -NoProfile -Command "Compress-Archive -Path 'dist\viCheck' -DestinationPath 'dist\viCheck-win64.zip' -Force" || echo Could not create the zip ^(the folder is still usable^).
 echo.
 echo ============================================================
 echo  Done:  %~dp0dist\viCheck\viCheck.exe
-echo  Copy the whole dist\viCheck folder to use it on another PC.
+echo  On another PC: copy the whole dist\viCheck folder, or unzip dist\viCheck-win64.zip
 echo ============================================================
 pause

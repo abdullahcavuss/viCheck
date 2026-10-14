@@ -92,3 +92,27 @@ textarea { width: 100%; font-family: var(--mono); font-size: 12.5px; padding: 8p
 
 /* markdown body images */
 .md-body img { max-width: 100%; height: auto; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+
+/* ---------- language switch */
+.langsw { display: inline-flex; border: 1px solid #33404f; border-radius: 6px; overflow: hidden; }
+.langsw a { color: #aab3bf; font-size: 11.5px; font-weight: 700; padding: 3px 8px; letter-spacing: .04em; }
+.langsw a + a { border-left: 1px solid #33404f; }
+.langsw a:hover { color: #fff; text-decoration: none; background: #222a35; }
+.langsw a.on { color: #14181f; background: #e6e9ee; }
+
+/* side panel tabs: wrap instead of being cut off (longer labels, other languages) */
+.vd-tabs { flex-wrap: wrap; row-gap: 0; }
+.vd-tabs button { padding: 8px 6px; }
+
+/* vidiff sidebar: the file details at the top can be folded away to give the change list more room */
+.head-tg { border: 1px solid var(--border); background: var(--panel); color: var(--text-2); border-radius: 5px; font: inherit; font-size: 11.5px; padding: 1px 7px; cursor: pointer; }
+.head-tg:hover { color: var(--text); background: var(--panel-2); }
+.head-tg .when-closed, .vd-side.head-closed .head-tg .when-open { display: none; }
+.vd-side.head-closed .head-tg .when-closed { display: inline; }
+.vd-side.head-closed .head .vd-paths, .vd-side.head-closed .head .vd-icons,
+.vd-side.head-closed .head .verdict, .vd-side.head-closed .head .notice { display: none; }
+.vd-side.head-closed .head { padding-bottom: 8px; }
+.vd-side.head-closed .head .fname { font-size: 13.5px; }
+.report-opts { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border); }
+.export-opts { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; padding: 8px 12px; margin: 0 0 12px; }
+.export-opts .chk { display: inline-flex; gap: 5px; align-items: center; font-size: 12.5px; }

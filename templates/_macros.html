@@ -20,10 +20,10 @@
 {%- endif -%}
 {%- endmacro %}
 
-{% macro status_badge(s) -%}
+{% macro status_badge(s, _=None) -%}
 {%- set m = {"added": ("added","+","Added"), "deleted": ("deleted","−","Deleted"), "modified": ("modified","~","Modified"), "renamed": ("renamed","→","Moved/renamed")} -%}
 {%- set v = m.get(s, ("modified","•",s)) -%}
-<span class="st {{v[0]}}" title="{{v[2]}}">{{v[1]}}</span>
+<span class="st {{v[0]}}" title="{{ _(v[2]) if _ else v[2] }}">{{v[1]}}</span>
 {%- endmacro %}
 
 {% macro avatar(name) -%}

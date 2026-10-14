@@ -4,6 +4,7 @@
  */
 (function () {
   "use strict";
+  const T = window.T || ((s, kw) => { let r = s; if (kw) for (const k in kw) r = r.split("{" + k + "}").join(kw[k]); return r; });
   const NS = "http://www.w3.org/2000/svg";
 
   const WIRE = {
@@ -11,11 +12,11 @@
     cluster: "#8b5a2b", refnum: "#0d6b60", variant: "#7b2e8a", array: "#444", other: "#3b3b3b", void: "#9aa0a6",
   };
   const ST = {
-    added: { c: "#1a7f37", f: "rgba(26,127,55,.13)", t: "Added" },
-    removed: { c: "#cf222e", f: "rgba(207,34,46,.12)", t: "Removed" },
-    modified: { c: "#d97706", f: "rgba(217,119,6,.14)", t: "Modified" },
-    moved: { c: "#2f6feb", f: "rgba(47,111,235,.08)", t: "Moved" },
-    reframed: { c: "#8250df", f: "rgba(130,80,223,.10)", t: "Moved into another structure/frame" },
+    added: { c: "#1a7f37", f: "rgba(26,127,55,.13)", t: T("Added") },
+    removed: { c: "#cf222e", f: "rgba(207,34,46,.12)", t: T("Removed") },
+    modified: { c: "#d97706", f: "rgba(217,119,6,.14)", t: T("Modified") },
+    moved: { c: "#2f6feb", f: "rgba(47,111,235,.08)", t: T("Moved") },
+    reframed: { c: "#8250df", f: "rgba(130,80,223,.10)", t: T("Moved into another structure/frame") },
   };
   const STRUCT_COLORS = {
     forLoop: "#8f949b", whileLoop: "#8f949b", timeLoop: "#7d8aa0",
@@ -23,7 +24,7 @@
     sequence: "#c2a774", flatSequence: "#c2a774", sequenceFrame: "#c2a774", timeFlatSequence: "#c2a774",
     commentNode: "#6e7378", decomposeRecomposeStructure: "#6c8db3",
   };
-  const KIND_NAMES = { subvi: "SubVI", prim: "Primitive", structure: "Structure", const: "Constant", terminal: "Terminal", node: "Node", variable: "Variable" };
+  const KIND_NAMES = { subvi: T("SubVI"), prim: T("Primitive"), structure: T("Structure"), const: T("Constant"), terminal: T("Terminal"), node: T("Node"), variable: T("Variable") };
 
   function el(tag, attrs, parent) {
     const e = document.createElementNS(NS, tag);
@@ -194,8 +195,8 @@
         const d = document.createElement("div");
         d.className = "pane-empty";
         d.innerHTML = m && m.error ? "⚠ " + esc(m.error)
-          : (m && m.empty ? (this.opts.side === "old" ? "No file in this version (newly added)" : "No file in this version (deleted)")
-            : "Block diagram is empty or could not be read");
+          : (m && m.empty ? (this.opts.side === "old" ? T("No file in this version (newly added)") : T("No file in this version (deleted)"))
+            : T("Block diagram is empty or could not be read"));
         this.container.appendChild(d);
       }
       if (!m || !m.bd) return;
@@ -576,9 +577,9 @@
       const z = document.createElement("div");
       z.className = "zoom-ctl";
       const mk = (txt, title, fn) => { const b = document.createElement("button"); b.textContent = txt; b.title = title; b.onclick = fn; z.appendChild(b); };
-      mk("+", "Zoom in", () => { const s = this.size(); this.zoomAt(1.3, s.w / 2, s.h / 2); });
-      mk("−", "Zoom out", () => { const s = this.size(); this.zoomAt(1 / 1.3, s.w / 2, s.h / 2); });
-      mk("⤢", "Fit", () => this.emit("fitrequest", this));
+      mk("+", T("Zoom in"), () => { const s = this.size(); this.zoomAt(1.3, s.w / 2, s.h / 2); });
+      mk("−", T("Zoom out"), () => { const s = this.size(); this.zoomAt(1 / 1.3, s.w / 2, s.h / 2); });
+      mk("⤢", T("Fit"), () => this.emit("fitrequest", this));
       this.container.appendChild(z);
     }
 
@@ -634,16 +635,16 @@
 
   function nodeTipHtml(n, pane, changes) {
     const name = pane.displayName(n);
-    let h = `<b>${esc(name)}</b><br><span class="k">${KIND_NAMES[n.kind] || n.kind}${n.kind === "prim" ? " · resID " + esc(n.prim) : ""}${n.kind === "terminal" ? " · " + (n.io === "indicator" ? "indicator" : "control") + (n.ctype_name ? " · " + esc(n.ctype_name) : "") : ""}${n.kind === "const" && n.vtype ? " · " + esc(n.vtype) : ""}${n.kind === "variable" ? " · " + (n.local ? "local" : "global") + " · " + (n.read ? "read" : "write") : ""}</span>`;
-    if (n.kind === "variable" && n.owner && !n.local) h += `<br><span class="k">Global VI: ${esc(n.owner)}</span>`;
-    if (n.kind === "const" && n.value != null) h += `<br>Value: <b>${esc(n.value)}</b>`;
-    if (n.kind === "structure" && n.frames && n.frames.length > 1) h += `<br><span class="k">${n.frames.length} frames</span>`;
-    if (n.path) h += `<br><span class="k">Location: ${esc(n.path)}</span>`;
+    let h = `<b>${esc(name)}</b><br><span class="k">${KIND_NAMES[n.kind] || n.kind}${n.kind === "prim" ? " · resID " + esc(n.prim) : ""}${n.kind === "terminal" ? " · " + (n.io === "indicator" ? T("indicator") : T("control")) + (n.ctype_name ? " · " + esc(n.ctype_name) : "") : ""}${n.kind === "const" && n.vtype ? " · " + esc(n.vtype) : ""}${n.kind === "variable" ? " · " + (n.local ? T("local") : T("global")) + " · " + (n.read ? T("read") : T("write")) : ""}</span>`;
+    if (n.kind === "variable" && n.owner && !n.local) h += `<br><span class="k">${T("Global VI:")} ${esc(n.owner)}</span>`;
+    if (n.kind === "const" && n.value != null) h += `<br>${T("Value:")} <b>${esc(n.value)}</b>`;
+    if (n.kind === "structure" && n.frames && n.frames.length > 1) h += `<br><span class="k">${T("{n} frames", { n: n.frames.length })}</span>`;
+    if (n.path) h += `<br><span class="k">${T("Location:")} ${esc(n.path)}</span>`;
     if (n.st && n.st !== "same" && ST[n.st]) {
       h += `<br><span class="stx" style="color:${ST[n.st].c === "#cf222e" ? "#ff8182" : ST[n.st].c === "#1a7f37" ? "#56d364" : ST[n.st].c === "#d97706" ? "#f0b45b" : "#79a8ff"}">● ${ST[n.st].t}</span>`;
       for (const id of (n.chg || [])) { const c = changes && changes[id]; if (c && c.detail) h += `<br>${esc(c.detail)}`; }
     }
-    if (n.kind === "prim") h += `<br><span class="k">Right-click / double-click: name it</span>`;
+    if (n.kind === "prim") h += `<br><span class="k">${T("Right-click / double-click: name it")}</span>`;
     return h;
   }
 

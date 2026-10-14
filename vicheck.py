@@ -80,8 +80,11 @@ def start_url(base, paths):
 class JsApi:
     """Functions the page can call as window.pywebview.api.* inside the desktop window."""
 
-    def __init__(self):
-        self.window = None
+    def __init__(self, window=None):
+        # Underscore: pywebview walks the public attributes of js_api to expose them to the page. A public
+        # reference to the Window would make it walk the native WinForms/WebView2 objects too, which blocks
+        # the UI thread (the window freezes while being moved or resized).
+        self._window = window
 
     def pick(self, kind, initial=""):
         import webview
@@ -94,7 +97,7 @@ class JsApi:
         kw = {"directory": initial if initial and os.path.isdir(initial) else (os.path.dirname(initial) if initial else "")}
         if kind != "folder":
             kw["file_types"] = ("LabVIEW files (*.vi;*.ctl;*.vit;*.vim;*.ctt)", "All files (*.*)")
-        res = self.window.create_file_dialog(ftype, **kw)
+        res = self._window.create_file_dialog(ftype, **kw)
         if not res:
             return ""
         return res[0] if isinstance(res, (list, tuple)) else str(res)
@@ -110,7 +113,7 @@ def run_webview(url, debug):
         pass
     win = webview.create_window("viCheck — LabVIEW VI compare", url, js_api=api, width=1440, height=900,
                                 min_size=(900, 600), text_select=True)
-    api.window = win
+    api._window = win
 
     def bind_drop():
         """Dropped files: the desktop window knows their full paths; hand them to the page."""
@@ -129,7 +132,6 @@ def run_webview(url, debug):
             except Exception:
                 pass
         try:
-            win.dom.document.events.dragover += DOMEventHandler(lambda e: None, True, True)
             win.dom.document.events.drop += DOMEventHandler(on_drop, True, True)
         except Exception:
             pass

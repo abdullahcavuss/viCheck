@@ -1,13 +1,22 @@
 {% extends "base.html" %}
 {% block title %}SVG · {{ name }}{% endblock %}
-{% block crumb %}<span class="crumb">/ SVG export</span>{% endblock %}
+{% block crumb %}<span class="crumb">/ {{ _("SVG export") }}</span>{% endblock %}
 {% block content %}
-<div class="small"><a href="{{ back }}">← Back to the diff</a></div>
+<div class="small"><a href="{{ back }}">← {{ _("Back to the diff") }}</a></div>
 <div class="row" style="margin:8px 0 14px">
-  <h2 class="grow" style="margin:0">{{ name }} — SVG export</h2>
-  <button class="btn" type="button" data-reveal="{{ out }}">📂 Open folder</button>
+  <h2 class="grow" style="margin:0">{{ _("SVG export of {name}", name=name) }}</h2>
+  {% if pdf %}<button class="btn primary" type="button" data-open-file="{{ pdf }}">📄 {{ _("Open PDF") }}</button>{% endif %}
+  <button class="btn" type="button" data-reveal="{{ out }}">📂 {{ _("Open folder") }}</button>
 </div>
-<p class="small muted" style="margin-top:-6px">Saved to <span class="mono">{{ out }}</span> — {{ svgs|length }} SVG file{{ '' if svgs|length == 1 else 's' }} and a README.md. Each SVG holds the A and the B block diagram; numbered boxes match the list. Click an image to open it on its own (zoom stays sharp; right-click → Inspect to look at the SVG elements).</p>
-{% if not svgs %}<div class="flash info">Nothing to draw: the block diagrams have no changes that can be marked (the VI may only have front panel, property or re-save differences).</div>{% endif %}
+<form class="card export-opts" method="get" action="{{ url_for('export_svg') }}">
+  <input type="hidden" name="a" value="{{ a or '' }}"><input type="hidden" name="b" value="{{ b or '' }}">
+  <label class="chk"><input type="checkbox" name="pdf" value="1" {{ 'checked' if opts.pdf }}> {{ _("PDF") }}</label>
+  <input type="hidden" name="details" value="0"><label class="chk"><input type="checkbox" name="details" value="1" {{ 'checked' if opts.details }}> {{ _("Detail views around the changes") }}</label>
+  <input type="hidden" name="flat" value="0"><label class="chk"><input type="checkbox" name="flat" value="1" {{ 'checked' if opts.flat }}> {{ _("Stacked Sequence → Flat") }}</label>
+  <button class="btn sm">↻ {{ _("Generate again") }}</button>
+</form>
+{% if pdf_error %}<div class="flash error">{{ _("Could not make the PDF:") }} {{ _(pdf_error) }}</div>{% endif %}
+<p class="small muted" style="margin-top:-6px">{{ _("Saved to") }} <span class="mono">{{ out }}</span> — {{ _n("{n} SVG file and a README.md.", "{n} SVG files and a README.md.", svgs|length) }} {{ _("Each SVG holds the A and the B block diagram; numbered boxes match the list. Click an image to open it on its own (zoom stays sharp; right-click → Inspect to look at the SVG elements).") }}</p>
+{% if not svgs %}<div class="flash info">{{ _("Nothing to draw: the VIs have no block diagram.") }}</div>{% endif %}
 <article class="card md-body"><div class="card-body">{{ body|safe }}</div></article>
 {% endblock %}

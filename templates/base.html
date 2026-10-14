@@ -1,9 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}Compare{% endblock %} · viCheck</title>
+<title>{% block title %}{{ _("Compare") }}{% endblock %} · viCheck</title>
+<script>window.I18N = {{ i18n_js|safe }}; window.LANG = "{{ lang }}";
+window.T = function (s, kw) { var r = (window.I18N && window.I18N[s]) || s; if (kw) for (var k in kw) r = r.split("{" + k + "}").join(kw[k]); return r; };</script>
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='vicheck.css') }}">
@@ -18,10 +20,11 @@
   {% block crumb %}{% endblock %}
   <span class="spacer"></span>
   <nav class="topnav">
-    <a href="{{ url_for('index') }}">New comparison</a>
-    <a href="{{ url_for('primitives_page') }}">Primitive names</a>
-    <a href="{{ url_for('about') }}">About</a>
-    {% if ui_mode != "browser" %}<button type="button" class="topbtn" data-open-browser title="Open this page in your web browser — e.g. to inspect the SVG with the browser's developer tools (F12)">↗ Open in browser</button>{% endif %}
+    <a href="{{ url_for('index') }}">{{ _("New comparison") }}</a>
+    <a href="{{ url_for('primitives_page') }}">{{ _("Primitive names") }}</a>
+    <a href="{{ url_for('about') }}">{{ _("About") }}</a>
+    {% if ui_mode != "browser" %}<button type="button" class="topbtn" data-open-browser title="{{ _("Open this page in your web browser — e.g. to inspect the SVG with the browser's developer tools (F12)") }}">{{ _("↗ Open in browser") }}</button>{% endif %}
+    <span class="langsw" title="{{ _("Language") }}">{% for code in langs %}<a href="{{ url_for('set_lang', code=code, next=request.full_path if request.query_string else request.path) }}" class="{{ 'on' if code == lang }}" lang="{{ code }}">{{ code|upper }}</a>{% endfor %}</span>
   </nav>
 </header>
 {% block body %}

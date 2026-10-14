@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% from "_macros.html" import icon %}
-{% block title %}New comparison{% endblock %}
+{% block title %}{{ _("New comparison") }}{% endblock %}
 {% block content %}
 <form class="cmp-form" method="get" action="{{ url_for('compare') }}" id="cmp-form">
   <div class="cmp-intro">
-    <h1>Compare LabVIEW code</h1>
-    <p class="muted">Choose two VIs or two folders. Block diagrams are parsed and compared without LabVIEW and drawn side by side as SVG.</p>
+    <h1>{{ _("Compare LabVIEW code") }}</h1>
+    <p class="muted">{{ _("Choose two VIs or two folders. Block diagrams are parsed and compared without LabVIEW and drawn side by side as SVG.") }}</p>
   </div>
   {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
   <div class="slots">
-    {% for side, label, val, sub in (("a", "A", a, "old / reference"), ("b", "B", b, "new / changed")) %}
+    {% for side, label, val, sub in (("a", "A", a, _("old / reference")), ("b", "B", b, _("new / changed"))) %}
     <div class="slot" data-slot="{{ side }}">
       <div class="slot-head">
         <span class="slot-tag {{ side }}">{{ label }}</span>
@@ -19,35 +19,35 @@
       </div>
       <div class="slot-drop" data-drop="{{ side }}">
         <div class="slot-icon" data-icon>{{ icon("vi", "ficon big") }}</div>
-        <div class="small muted" data-hint>Drop a VI or a folder here</div>
+        <div class="small muted" data-hint>{{ _("Drop a VI or a folder here") }}</div>
       </div>
-      <input type="text" name="{{ side }}" value="{{ val }}" placeholder="C:\LabVIEW\Project\Main.vi  or  C:\LabVIEW\Project" autocomplete="off" spellcheck="false" data-path="{{ side }}">
+      <input type="text" name="{{ side }}" value="{{ val }}" placeholder="C:\LabVIEW\Project\Main.vi  —  C:\LabVIEW\Project" autocomplete="off" spellcheck="false" data-path="{{ side }}">
       <div class="row slot-btns">
-        <button type="button" class="btn sm" data-pick="file" data-for="{{ side }}">{{ icon("vi") }} Choose VI…</button>
-        <button type="button" class="btn sm" data-pick="folder" data-for="{{ side }}">{{ icon("dir") }} Choose folder…</button>
+        <button type="button" class="btn sm" data-pick="file" data-for="{{ side }}">{{ icon("vi") }} {{ _("Choose VI…") }}</button>
+        <button type="button" class="btn sm" data-pick="folder" data-for="{{ side }}">{{ icon("dir") }} {{ _("Choose folder…") }}</button>
         <span class="grow"></span>
-        <button type="button" class="btn sm ghost" data-clear="{{ side }}" title="Clear">✕</button>
+        <button type="button" class="btn sm ghost" data-clear="{{ side }}" title="{{ _("Clear") }}">✕</button>
       </div>
     </div>
     {% if loop.first %}
     <div class="slot-mid">
-      <button type="button" class="swap" id="swap" title="Swap A and B">⇄</button>
+      <button type="button" class="swap" id="swap" title="{{ _("Swap A and B") }}">⇄</button>
     </div>
     {% endif %}
     {% endfor %}
   </div>
   <div class="cmp-go">
-    <button class="btn primary big" type="submit" id="go">Compare</button>
+    <button class="btn primary big" type="submit" id="go">{{ _("Compare") }}</button>
     <span class="small muted" id="go-hint"></span>
   </div>
 </form>
 
 <div class="grid-2 home-lower">
   <section class="card">
-    <div class="card-head"><b>Recent comparisons</b><span class="grow"></span>
-      {% if recent %}<form method="post" action="{{ url_for('clear_recent') }}"><button class="btn sm ghost">Clear</button></form>{% endif %}
+    <div class="card-head"><b>{{ _("Recent comparisons") }}</b><span class="grow"></span>
+      {% if recent %}<form method="post" action="{{ url_for('clear_recent') }}"><button class="btn sm ghost">{{ _("Clear") }}</button></form>{% endif %}
     </div>
-    {% if not recent %}<div class="empty small">Nothing yet. Your comparisons will be listed here.</div>{% endif %}
+    {% if not recent %}<div class="empty small">{{ _("Nothing yet. Your comparisons will be listed here.") }}</div>{% endif %}
     {% for r in recent %}
     <a class="recent" href="{{ url_for('compare', a=r.a, b=r.b) }}">
       {{ icon("dir" if r.kind == "folder" else "vi") }}
@@ -57,20 +57,20 @@
   </section>
   <aside>
     <div class="card">
-      <div class="card-head"><b>Folder comparison: ignored files</b></div>
+      <div class="card-head"><b>{{ _("Folder comparison: ignored files") }}</b></div>
       <form class="card-body" method="post" action="{{ url_for('save_settings') }}">
         <textarea name="ignore" rows="4" placeholder="*.log&#10;builds/&#10;Test Data/">{{ settings.ignore }}</textarea>
-        <div class="hint">One rule per line. <code>name/</code> ignores a folder, <code>*.ext</code> a file type. Always ignored: <code>{{ default_ignore|join("  ") }}</code></div>
-        <button class="btn sm" style="margin-top:8px">Save</button>
+        <div class="hint">{{ _("One rule per line. <code>name/</code> ignores a folder, <code>*.ext</code> a file type. Always ignored:")|safe }} <code>{{ default_ignore|join("  ") }}</code></div>
+        <button class="btn sm" style="margin-top:8px">{{ _("Save") }}</button>
       </form>
     </div>
     <div class="card">
       <div class="card-body small muted">
-        <b style="color:var(--text)">Tips</b>
+        <b style="color:var(--text)">{{ _("Tips") }}</b>
         <ul style="padding-left:18px;margin:8px 0 0">
-          <li>Two folders: every file is matched by its relative path; VIs that were only re-saved by LabVIEW are grouped separately.</li>
-          <li>From a command line or LabVIEW's <i>System Exec</i>: <code>viCheck.exe "A.vi" "B.vi"</code></li>
-          <li>Diagrams are SVG: right-click → <i>Inspect</i>, or <b>↗ Open in browser</b> and use the developer tools (F12). <b>Export SVG</b> saves them as files.</li>
+          <li>{{ _("Two folders: every file is matched by its relative path; VIs that were only re-saved by LabVIEW are grouped separately.") }}</li>
+          <li>{{ _("From a command line or LabVIEW's <i>System Exec</i>:")|safe }} <code>viCheck.exe "A.vi" "B.vi"</code></li>
+          <li>{{ _("Diagrams are SVG: right-click → <i>Inspect</i>, or <b>↗ Open in browser</b> and use the developer tools (F12). <b>Export SVG</b> saves them as files.")|safe }}</li>
         </ul>
       </div>
     </div>

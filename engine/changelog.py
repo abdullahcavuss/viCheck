@@ -126,7 +126,8 @@ def _prim_sub(text, names):
     return re.sub(r"Prim (\d+)", lambda m: names.get(m.group(1), m.group(0)), text or "")
 
 
-def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_tiles=False, cats=None):
+def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_tiles=False, cats=None,
+             flat=True, details=False):
     cats = set(cats or DEFAULT_CATS)
     head = store.get_commit(repo, head_ref)
     if head is None:
@@ -149,7 +150,8 @@ def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_t
         verdict = d["diff"].get("verdict") or {"level": "functional", "parts": [], "cats": ["logic"]}
         sel = [p for p in verdict["parts"] if p.get("cat", "other") in cats or p["key"] in ("error", "file")]
         item = {"c": c, "d": d, "verdict": verdict, "parts": sel,
-                "base_short": base["short"] if base else None, "head_short": head["short"]}
+                "base_short": base["short"] if base else None, "head_short": head["short"],
+                "old_title": base.get("image_title") if base else None, "new_title": head.get("image_title")}
         if any(p["key"] == "error" for p in verdict["parts"]):
             errors.append(item)
         elif verdict["level"] == "saved":
@@ -239,7 +241,7 @@ def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_t
         for item in group:
             if progress:
                 progress(total, total, "images: " + item["c"]["path"])
-            L.extend(_vi_section(item, out_dir, names, all_tiles, cats))
+            L.extend(_vi_section(item, out_dir, names, all_tiles, cats, flat=flat, details=details))
 
     if errors:
         L.append("## Unreadable VIs")
@@ -308,7 +310,7 @@ def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_t
             "cats": sorted(cats)}
 
 
-def _vi_section(item, out_dir, names, all_tiles, cats):
+def _vi_section(item, out_dir, names, all_tiles, cats, flat=True, details=False):
     c, d, verdict = item["c"], item["d"], item["verdict"]
     res = d["diff"]
     L = []
@@ -363,8 +365,8 @@ def _vi_section(item, out_dir, names, all_tiles, cats):
     new_bd = d["new"].get("bd") if not d["new"].get("empty") else None
     old_bd = d["old"].get("bd") if not d["old"].get("empty") else None
 
-    old_t = "Previous version" + (" (%s)" % item["base_short"] if item.get("base_short") else "")
-    new_t = "New version" + (" (%s)" % item["head_short"] if item.get("head_short") else "")
+    old_t = item.get("old_title") or ("Previous version" + (" (%s)" % item["base_short"] if item.get("base_short") else ""))
+    new_t = item.get("new_title") or ("New version" + (" (%s)" % item["head_short"] if item.get("head_short") else ""))
     if c["status"] == "added":
         old_bd, ho, ro = None, {}, []
     elif c["status"] == "deleted":
@@ -374,7 +376,7 @@ def _vi_section(item, out_dir, names, all_tiles, cats):
     if (has_old or has_new) and not (c["status"] == "modified" and not (rn or ro)):
         try:
             views = svgrender.render_pair(old_bd if has_old else None, ho, ro, new_bd if has_new else None, hn, rn,
-                                          base, names, old_title=old_t, new_title=new_t)
+                                          base, names, old_title=old_t, new_title=new_t, flat=flat, details=details)
         except Exception as e:  # an image failure for one VI must not stop the whole CHANGELOG
             import logging
             logging.exception("Could not render CHANGELOG image: %s", c["path"])
@@ -392,6 +394,12 @@ def _vi_section(item, out_dir, names, all_tiles, cats):
             rel = os.path.relpath(v["file"], out_dir).replace(os.sep, "/").replace(" ", "%20")
             L.append("[![%s — previous and new version](%s)](%s)" % (md_escape(title), rel, rel))
             L.append("")
+            for k, dv in enumerate(v.get("details") or [], 1):
+                drel = os.path.relpath(dv["file"], out_dir).replace(os.sep, "/").replace(" ", "%20")
+                L.append("_Detail %d · change %s_" % (k, num_ranges(dv["nums"])))
+                L.append("")
+                L.append("[![%s — detail](%s)](%s)" % (md_escape(title), drel, drel))
+                L.append("")
         if views:
             L.append("_The image is an SVG: click to open it full size; it stays sharp when you zoom in the browser._")
             L.append("")

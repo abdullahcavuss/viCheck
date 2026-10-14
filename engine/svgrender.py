@@ -5,9 +5,13 @@ Draws the block diagrams of the previous and new version in ONE SVG file (for th
 - The drawing code is shared with render.Painter: SvgDraw mimics the part of Pillow's ImageDraw
   interface that is used and emits SVG elements.
 - Wide diagrams place the two versions one above the other, narrow ones side by side.
+- Detail views: a large VI shrinks to a few percent when the whole diagram is fitted to a PDF page. For every
+  group of nearby changes a cropped A + B pair is drawn at about 1:1 (one LabVIEW pixel = one CSS pixel), both
+  sides with the same size and scale.
 """
 import html
 import math
+import re
 
 from . import render as R
 
@@ -17,6 +21,16 @@ HEADER = 44                # height of the version header
 FONT_FAMILY = "Segoe UI, Arial, DejaVu Sans, Liberation Sans, sans-serif"
 MAX_VIEWS = 6
 BADGE_R = 6.0              # badge radius in LabVIEW pixels (kept small so it does not hide the diagram)
+# detail crops, in LabVIEW pixels: the largest area that still fits an A4 landscape page at 1:1,
+# with A and B side by side (first) or one above the other (second)
+DETAIL_FIT = ((500, 520), (1000, 270))
+DETAIL_MARGIN = 34
+DETAIL_MIN = (280, 150)
+DETAIL_HEADER = 44         # SVG units
+MAX_DETAILS = 12           # per view
+DETAIL_ZOOM = 1.4
+PAGE_PX = (1040, 600)      # usable CSS pixels of an A4 landscape page (minus caption)
+PAGE_ASPECT = 1.55         # usable area of an A4 landscape page (and of most screens)
 
 
 def _c(col):
@@ -110,7 +124,7 @@ def _boost(width):
     return max(1.0, min(3.0, width / 2600.0))
 
 
-def _paint_side(p, dim=True):
+def _paint_side(p, dim=True, badge=1.0):
     """SVG counterpart of Painter.render(). Returns: SVG elements (str)."""
     d = SvgDraw()
     nodes, wires, notes, structs = p.visible_items()
@@ -144,6 +158,11 @@ def _paint_side(p, dim=True):
             p.draw_selector(d, n)
     # highlights
     badges = []
+    p.regions = {}             # change number -> (x0, y0, x1, y1) in LabVIEW coordinates (for the detail crops)
+
+    def reg(num, x0, y0, x1, y1):
+        r = p.regions.get(num)
+        p.regions[num] = (x0, y0, x1, y1) if r is None else (min(r[0], x0), min(r[1], y0), max(r[2], x1), max(r[3], y1))
     for w in wires:
         h = p.hl.get(w.get("uid"))
         if not h:
@@ -152,6 +171,8 @@ def _paint_side(p, dim=True):
         best, bl = None, -1
         for seg in p.wire_path(w):
             d.line([p.P(*q) for q in seg], fill=col + (110,), width=p.lw(6), joint="curve")
+            for qx, qy in seg:
+                reg(h[1], qx - 4, qy - 4, qx + 4, qy + 4)
             for (ax, ay), (bx, by) in zip(seg, seg[1:]):
                 ln = abs(bx - ax) + abs(by - ay)
                 if ln > bl:
@@ -168,11 +189,17 @@ def _paint_side(p, dim=True):
         ih = max(item["h"], 14) if item in notes else item["h"]
         box = p.R(item["x"] - pad, item["y"] - pad, iw + 2 * pad, ih + 2 * pad)
         filled = item not in structs
+        if item in structs:
+            # a changed structure can cover most of the diagram; the detail shows its top-left part with the badge
+            reg(h[1], item["x"] - pad, item["y"] - pad, item["x"] + min(iw, DETAIL_FIT[0][0] - 2 * DETAIL_MARGIN) + pad,
+                item["y"] + min(ih, DETAIL_FIT[1][1] - 2 * DETAIL_MARGIN) + pad)
+        else:
+            reg(h[1], item["x"] - pad, item["y"] - pad, item["x"] + iw + pad, item["y"] + ih + pad)
         d.rounded_rectangle(box, radius=4 * p.s, outline=col + (255,), width=p.lw(2.2),
                             fill=(col + (40,)) if filled else None)
         badges.append((h, item["x"] - pad, item["y"] - pad, True))
     seen, placed = set(), []
-    r = BADGE_R * p.s
+    r = BADGE_R * p.s * badge
     for (st, num), x, y, corner in badges:
         if num in seen:
             continue
@@ -191,7 +218,7 @@ def _paint_side(p, dim=True):
             cx = hit[0] + 2.2 * r
         placed.append((cx, cy))
         d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=R.ST[st], outline=(255, 255, 255), width=p.lw(1.2))
-        fs = (7.5 if num < 100 else 6.2) * p.s
+        fs = (7.5 if num < 100 else 6.2) * p.s * badge
         d.out.append('<text x="%s" y="%s" font-size="%s" font-weight="bold" fill="#fff" text-anchor="middle">%d</text>' % (
             _n(cx), _n(cy + fs * 0.36), _n(fs), num))
     return d.out
@@ -217,25 +244,28 @@ def _assign_desc(structs, assign):
     return out
 
 
-def _views(bd, hl, items):
+def _views(bd, hl, items, flat=True):
     if bd is None:
         return [], {}
-    flat = R.flatten_stacked(bd)
+    flat = R.flatten_stacked(bd) if flat else bd
     structs = R.index_structures(flat)
     views = R.plan_views(structs, items, max_views=MAX_VIEWS) if items else []
     return [(flat, structs, a, nums) for a, nums in views] or [(flat, structs, {}, [])], structs
 
 
 def render_pair(old_bd, old_hl, old_items, new_bd, new_hl, new_items, out_prefix, names=None,
-                old_title="Previous version", new_title="New version"):
+                old_title="Previous version", new_title="New version", flat=True, details=False):
     """Draws the previous and new version in the same SVG.
 
     *_hl    : {uid: (status, number)}
     *_items : [(number, reveal)]  (for choosing case frames)
-    Returns: [{"file", "nums", "desc"}]  — several views if the changes are in different case frames.
+    flat    : unfold Stacked Sequences side by side (False: one view per frame that has changes)
+    details : also draw cropped A + B detail views of the changes
+    Returns: [{"file", "nums", "desc", "details": [{"file", "nums"}]}]  — several views if the changes are in
+    different case frames.
     """
-    ov, _ = _views(old_bd, old_hl, old_items)
-    nv, _ = _views(new_bd, new_hl, new_items)
+    ov, _ = _views(old_bd, old_hl, old_items, flat)
+    nv, _ = _views(new_bd, new_hl, new_items, flat)
     n = max(len(ov), len(nv), 1)
     out = []
     for i in range(n):
@@ -244,7 +274,7 @@ def render_pair(old_bd, old_hl, old_items, new_bd, new_hl, new_items, out_prefix
         nums = set()
         for title, views, hl, tag in ((old_title, ov, old_hl, "old"), (new_title, nv, new_hl, "new")):
             if not views:
-                sides.append((title, None, []))
+                sides.append((title, None, [], tag))
                 continue
             flat, structs, assign, vnums = views[i] if i < len(views) else views[0]
             if i >= len(views):
@@ -255,23 +285,164 @@ def render_pair(old_bd, old_hl, old_items, new_bd, new_hl, new_items, out_prefix
             ad = _assign_desc(structs, assign)
             if ad:
                 desc.append((tag, ", ".join(ad)))
-            sides.append((title + ((" — " + ", ".join(ad)) if ad else ""), p, _paint_side(p)))
+            sides.append((title + ((" — " + ", ".join(ad)) if ad else ""), p, _paint_side(p), tag))
         fn = "%s_v%d.svg" % (out_prefix, i + 1)
-        _write_svg(fn, sides)
+        # the whole diagram of a large VI is drawn small: larger badges show where the changes are
+        big = _boost(max((sd[1].W for sd in sides if sd[1] is not None), default=0) * 1.6)
+        if big > 1.0:
+            _write_svg(fn, [(t, p, _paint_side(p, badge=big) if p is not None else b, tg) for t, p, b, tg in sides])
+        else:
+            _write_svg(fn, sides)
         if len(desc) == 2 and desc[0][1] == desc[1][1]:
             desc = [desc[0][1]]
         else:
             desc = ["%s: %s" % ("previous" if t == "old" else "new", a) for t, a in desc]
-        out.append({"file": fn, "nums": sorted(nums), "desc": desc})
+        dets = []
+        if details and nums:
+            for k, (cnums, crops) in enumerate(_detail_crops(sides, sorted(nums)), 1):
+                dfn = "%s_v%d_d%d.svg" % (out_prefix, i + 1, k)
+                _write_detail(dfn, sides, crops, cnums)
+                dets.append({"file": dfn, "nums": cnums})
+        out.append({"file": fn, "nums": sorted(nums), "desc": desc, "details": dets})
     return out
+
+
+# ---------------------------------------------------------------- detail crops
+def _union(a, b):
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return (min(a[0], b[0]), min(a[1], b[1]), max(a[2], b[2]), max(a[3], b[3]))
+
+
+def _fits(box):
+    w = box[2] - box[0] + 2 * DETAIL_MARGIN
+    h = box[3] - box[1] + 2 * DETAIL_MARGIN
+    return any(w <= fw and h <= fh for fw, fh in DETAIL_FIT)
+
+
+def _detail_crops(sides, nums):
+    """Groups nearby changes. Returns [(nums, [crop per side in LabVIEW coordinates or None])]."""
+    regs = [(p.regions if p is not None else {}) for _, p, _, _ in sides]
+
+    def where(n):
+        # both sides use the LabVIEW coordinates of the diagram, so A and B get the same frame (like the synced
+        # panes of the viewer): the union of the item in A and in B
+        b = None
+        for r in regs:
+            b = _union(b, r.get(n))
+        return b
+    items = sorted(((n, where(n)) for n in nums if where(n) is not None), key=lambda t: (t[1][1], t[1][0]))
+    clusters = []    # [nums, box]
+    for n, box in items:
+        for c in clusters:
+            u = _union(c[1], box)
+            if _fits(u):
+                c[0].append(n)
+                c[1] = u
+                break
+        else:
+            clusters.append([[n], box])
+    clusters.sort(key=lambda c: min(c[0]))
+    out = []
+    for cnums, b in clusters[:MAX_DETAILS]:
+        W = max(DETAIL_MIN[0], b[2] - b[0] + 2 * DETAIL_MARGIN)
+        H = max(DETAIL_MIN[1], b[3] - b[1] + 2 * DETAIL_MARGIN)
+        cx, cy = (b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0
+        crop = (cx - W / 2.0, cy - H / 2.0, cx + W / 2.0, cy + H / 2.0)
+        crops = [crop for _ in regs]
+        out.append((sorted(cnums), crops))
+    return out
+
+
+_NUM = r"(-?[\d.]+)"
+
+
+def _elem_box(el):
+    """Rough bounding box of one SVG element string written by SvgDraw (None: unknown, keep it)."""
+    tag = el[1:el.find(" ")] if el.startswith("<") else ""
+    g = lambda k: re.search(r'\b%s="%s"' % (k, _NUM), el)
+    try:
+        if tag == "rect":
+            x, y, w, h = (float(g(k).group(1)) for k in ("x", "y", "width", "height"))
+            return (x, y, x + w, y + h)
+        if tag == "ellipse":
+            cx, cy, rx, ry = (float(g(k).group(1)) for k in ("cx", "cy", "rx", "ry"))
+            return (cx - rx, cy - ry, cx + rx, cy + ry)
+        if tag in ("polyline", "polygon"):
+            pts = re.search(r'points="([^"]*)"', el).group(1).replace(",", " ").split()
+            xs, ys = [float(v) for v in pts[0::2]], [float(v) for v in pts[1::2]]
+            return (min(xs), min(ys), max(xs), max(ys))
+        if tag == "text":
+            x, y, fs = (float(g(k).group(1)) for k in ("x", "y", "font-size"))
+            n = len(re.sub(r"<[^>]*>", "", el)) - 0
+            return (x - n * fs, y - fs * 1.2, x + n * fs, y + fs * 0.4)
+    except (AttributeError, ValueError, IndexError):
+        return None
+    return None
+
+
+def _write_detail(fn, sides, crops, nums):
+    """A + B crops of the same size; 1 LabVIEW pixel = 1 CSS pixel in the written width/height."""
+    s = SVG_SCALE
+    W = (crops[0][2] - crops[0][0]) * s
+    H = (crops[0][3] - crops[0][1]) * s
+    vertical = W > DETAIL_FIT[0][0] * s
+    hd = DETAIL_HEADER
+    if vertical:
+        TW, TH = W, 2 * (hd + H) + GAP / 2
+        offs = [(0, 0), (0, hd + H + GAP / 2)]
+    else:
+        TW, TH = 2 * W + GAP / 2, hd + H
+        offs = [(0, 0), (W + GAP / 2, 0)]
+    # written size in CSS pixels: 1 LabVIEW pixel = 1 px, enlarged (up to 1.4x) while it still fits an A4 page
+    z = max(1.0, min(DETAIL_ZOOM, PAGE_PX[0] / (TW / s), PAGE_PX[1] / (TH / s)))
+    parts = ['<?xml version="1.0" encoding="UTF-8"?>',
+             '<svg xmlns="http://www.w3.org/2000/svg" width="%s" height="%s" viewBox="0 0 %s %s" font-family="%s">' % (
+                 _n(TW / s * z), _n(TH / s * z), _n(TW), _n(TH), FONT_FAMILY),
+             '<defs><pattern id="g" width="%s" height="%s" patternUnits="userSpaceOnUse">'
+             '<path d="M %s 0 L 0 0 0 %s" fill="none" stroke="#f0f2f5" stroke-width="1"/></pattern></defs>' % (
+                 _n(16 * s), _n(16 * s), _n(16 * s), _n(16 * s)),
+             '<rect width="100%" height="100%" fill="#ffffff"/>']
+    label = "#" + ", #".join(str(n) for n in nums)
+    for (title, p, body, tag), crop, (bx, by) in zip(sides, crops, offs):
+        col = "#1a7f37" if tag == "new" else "#57606a"
+        short = title.split(" — ")[0]
+        parts.append('<g transform="translate(%s,%s)">' % (_n(bx), _n(by)))
+        parts.append('<rect x="0" y="0" width="%s" height="%s" rx="5" fill="%s"/>' % (_n(W), _n(hd - 6), col))
+        parts.append('<text x="12" y="%s" font-size="23" font-weight="bold" fill="#fff">%s <tspan font-weight="normal">%s</tspan></text>' % (
+            _n(hd - 15), html.escape(short, quote=False), html.escape(label, quote=False)))
+        parts.append('<g transform="translate(0,%s)">' % _n(hd))
+        parts.append('<rect width="%s" height="%s" fill="url(#g)" stroke="#d0d7de" stroke-width="1"/>' % (_n(W), _n(H)))
+        if p is None:
+            parts.append('<text x="%s" y="%s" font-size="18" fill="#8c959f" text-anchor="middle">(not in this version)</text>' % (
+                _n(W / 2), _n(H / 2)))
+        else:
+            x0, y0 = p.P(crop[0], crop[1])
+            x1, y1 = p.P(crop[2], crop[3])
+            parts.append('<svg width="%s" height="%s" viewBox="%s %s %s %s" overflow="hidden">' % (
+                _n(W), _n(H), _n(x0), _n(y0), _n(x1 - x0), _n(y1 - y0)))
+            for el in body:      # only what can be seen in the crop: keeps the files (and the PDF) small
+                b = _elem_box(el)
+                if b is None or (b[2] >= x0 and b[0] <= x1 and b[3] >= y0 and b[1] <= y1):
+                    parts.append(el)
+            parts.append('</svg>')
+        parts.append('</g></g>')
+    parts.append('</svg>')
+    with open(fn, "w", encoding="utf-8") as f:
+        f.write("\n".join(parts))
 
 
 def _write_svg(fn, sides):
     # layout: wide diagrams one above the other, narrow ones side by side
-    dims = [(p.W, p.H) if p else (480.0, 160.0) for _, p, _ in sides]
+    dims = [(p.W, p.H) if p else (480.0, 160.0) for _, p, _, _ in sides]
     mw = max(w for w, _ in dims)
     mh = max(h for _, h in dims)
-    vertical = mw > mh * 1.3
+    # pick the arrangement that is drawn larger on a landscape page / screen (width : height = PAGE_ASPECT)
+    side_w, side_h = sum(w for w, _ in dims) + GAP, mh + HEADER
+    vert_w, vert_h = mw, sum(h for _, h in dims) + 2 * HEADER + GAP
+    vertical = min(PAGE_ASPECT / vert_w, 1.0 / vert_h) > min(PAGE_ASPECT / side_w, 1.0 / side_h)
     hd0 = HEADER * _boost(mw if vertical else sum(w for w, _ in dims) + GAP)
     boxes = []
     if vertical:
@@ -295,8 +466,8 @@ def _write_svg(fn, sides):
              '<rect width="100%" height="100%" fill="#ffffff"/>']
     hd = hd0
     k = hd0 / HEADER
-    for (title, p, body), (bx, by, w, h) in zip(sides, boxes):
-        new = title.startswith("New")
+    for (title, p, body, tag), (bx, by, w, h) in zip(sides, boxes):
+        new = tag == "new"   # B side: colored by side, not by the (translatable) title
         col = "#1a7f37" if new else "#57606a"
         parts.append('<g transform="translate(%s,%s)">' % (_n(bx), _n(by)))
         parts.append('<rect x="0" y="0" width="%s" height="%s" rx="6" fill="%s"/>' % (_n(w), _n(hd - 8 * k), col))

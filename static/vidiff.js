@@ -2,6 +2,7 @@
 (function () {
   "use strict";
   const { Pane, Tip, ST, esc, nodeTipHtml } = window.VIDiagram;
+  const T = window.T || ((s, kw) => { let r = s; if (kw) for (const k in kw) r = r.split("{" + k + "}").join(kw[k]); return r; });
 
   // ------------------------------------------------ shared: menu, primitive names
   const Ctx = {
@@ -30,7 +31,7 @@
     try { return await (await fetch("/api/prim-names")).json(); } catch (e) { return {}; }
   }
   async function renamePrim(resId, current, panes) {
-    const name = prompt("Name for primitive #" + resId + " (e.g. Add, Equal?, Index Array). Leave empty to delete the name.\nThis name is used in all VIs.", current || "");
+    const name = prompt(T("Name for primitive #{id} (e.g. Add, Equal?, Index Array). Leave empty to delete the name.\nThis name is used in all VIs.", { id: resId }), current || "");
     if (name === null) return;
     const r = await fetch("/api/prim-names", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: resId, name }) });
     const names = await r.json();
@@ -55,12 +56,12 @@
   function bindCommon(pane, panes, changesById) {
     pane.on("hover", (n, ev, p) => { Tip.show(nodeTipHtml(n, p, changesById), ev); });
     pane.on("wirehover", (w, ev) => {
-      let h = `<b>Wire</b> <span class="k">${esc(w.cat)}${w.arr ? " array" : ""}</span><br><span class="k">${w.ends.length} ends</span>`;
+      let h = `<b>${T("Wire")}</b> <span class="k">${esc(w.cat)}${w.arr ? " " + T("array") : ""}</span><br><span class="k">${T("{n} ends", { n: w.ends.length })}</span>`;
       if (w.st && w.st !== "same" && ST[w.st]) h += `<br><span class="stx">● ${ST[w.st].t}</span>`;
       Tip.show(h, ev);
     });
     pane.on("notehover", (t, ev) => {
-      let h = `<b>Comment</b><br>${esc(t.text.slice(0, 300))}`;
+      let h = `<b>${T("Comment")}</b><br>${esc(t.text.slice(0, 300))}`;
       if (t.st && t.st !== "same" && ST[t.st]) h += `<br><span class="stx">● ${ST[t.st].t}</span>`;
       Tip.show(h, ev);
     });
@@ -69,9 +70,9 @@
     pane.on("framemenu", (n, ev, p) => frameMenu(p, n, ev));
     pane.on("context", (n, ev, p) => {
       const items = [];
-      if (n.kind === "prim") items.push({ label: "Name primitive…", fn: () => renamePrim(n.prim, p.primNames[n.prim], panes) });
-      if (n.frames && n.frames.length > 1) items.push({ label: "Choose frame…", fn: () => frameMenu(p, n, ev) });
-      items.push({ label: "Copy name", fn: () => navigator.clipboard && navigator.clipboard.writeText(p.displayName(n)) });
+      if (n.kind === "prim") items.push({ label: T("Name primitive…"), fn: () => renamePrim(n.prim, p.primNames[n.prim], panes) });
+      if (n.frames && n.frames.length > 1) items.push({ label: T("Choose frame…"), fn: () => frameMenu(p, n, ev) });
+      items.push({ label: T("Copy name"), fn: () => navigator.clipboard && navigator.clipboard.writeText(p.displayName(n)) });
       Ctx.show(items, ev);
     });
     pane.svg.addEventListener("dblclick", ev => {
@@ -88,7 +89,7 @@
     const holder = root.querySelector(".viewer");
     const loading = document.createElement("div");
     loading.className = "loading-overlay";
-    loading.innerHTML = '<span class="spinner"></span><span>Parsing the VI (no LabVIEW needed)…</span>';
+    loading.innerHTML = '<span class="spinner"></span><span>' + esc(T("Parsing the VI (no LabVIEW needed)…")) + '</span>';
     holder.appendChild(loading);
     const [model, names] = await Promise.all([fetch(url).then(r => r.json()), loadPrimNames()]);
     loading.remove();
@@ -145,7 +146,7 @@
       data.names = names;
       if (data.error) throw new Error(data.error);
     } catch (e) {
-      loading.innerHTML = "⚠ Could not compute the diff: " + esc(e.message);
+      loading.innerHTML = esc(T("⚠ Could not compute the diff:")) + " " + esc(e.message);
       return;
     }
     loading.remove();
@@ -250,14 +251,14 @@
     const tabs = side.querySelectorAll(".vd-tabs button");
     const counts = diff.counts;
     const FILTERS = [
-      { key: "added", label: "Added", color: "#1a7f37", kinds: ["added"], on: true },
-      { key: "removed", label: "Removed", color: "#cf222e", kinds: ["removed"], on: true },
-      { key: "modified", label: "Modified", color: "#d97706", kinds: ["modified"], on: true },
-      { key: "reframe", label: "Moved to another frame", color: "#8250df", kinds: [], on: true, reframe: true },
-      { key: "wire", label: "Wires", color: "#57606a", kinds: ["wire_added", "wire_removed", "wire_modified"], on: true },
-      { key: "note", label: "Comments", color: "#c9b400", kinds: ["note_added", "note_removed"], on: true },
-      { key: "moved", label: "Moved", color: "#2f6feb", kinds: ["moved"], on: false },
-      { key: "auto", label: "Timed Loop / XNode internal setting", color: "#8b949e", kinds: [], on: false, auto: true },
+      { key: "added", label: T("Added"), color: "#1a7f37", kinds: ["added"], on: true },
+      { key: "removed", label: T("Removed"), color: "#cf222e", kinds: ["removed"], on: true },
+      { key: "modified", label: T("Modified"), color: "#d97706", kinds: ["modified"], on: true },
+      { key: "reframe", label: T("Moved to another frame"), color: "#8250df", kinds: [], on: true, reframe: true },
+      { key: "wire", label: T("Wires"), color: "#57606a", kinds: ["wire_added", "wire_removed", "wire_modified"], on: true },
+      { key: "note", label: T("Comments"), color: "#c9b400", kinds: ["note_added", "note_removed"], on: true },
+      { key: "moved", label: T("Moved"), color: "#2f6feb", kinds: ["moved"], on: false },
+      { key: "auto", label: T("Timed Loop / XNode internal setting"), color: "#8b949e", kinds: [], on: false, auto: true },
     ];
     const nReframe = changes.filter(c => c.reframe).length;
     function kindCount(f) {
@@ -304,7 +305,7 @@
         const reframeOn = FILTERS.find(f => f.reframe).on;
         const items = changes.filter(c => c.cat === "auto" ? autoOn : c.reframe ? reframeOn : on.has(c.kind));
         if (!items.length) {
-          list.innerHTML = `<div class="empty small">${changes.length ? "No changes match the filter." : "No functional change found on the block diagram.<br><span class=\"faint\">The file was most likely only re-saved or recompiled.</span>"}</div>`;
+          list.innerHTML = `<div class="empty small">${changes.length ? esc(T("No changes match the filter.")) : esc(T("No functional change found on the block diagram.")) + "<br><span class=\"faint\">" + esc(T("The file was most likely only re-saved or recompiled.")) + "</span>"}</div>`;
         }
         for (const c of items) {
           const d = document.createElement("div");
@@ -316,35 +317,35 @@
           list.appendChild(d);
         }
       } else if (currentTab === "fp") {
-        if (!diff.fp.length) list.innerHTML = `<div class="empty small">No added/removed/type-changed front panel controls.</div>`;
+        if (!diff.fp.length) list.innerHTML = `<div class="empty small">${esc(T("No added/removed/type-changed front panel controls."))}</div>`;
         for (const c of diff.fp) {
           const ic = ICON[c.kind];
           list.insertAdjacentHTML("beforeend", `<div class="vd-item"><span class="st ${ic[0]}">${ic[1]}</span><div><div class="t">${esc(c.name)}</div><div class="d">${esc(c.detail)}</div></div></div>`);
         }
         const fp = data.new.fp && data.new.fp.length ? data.new.fp : data.old.fp || [];
         if (fp.length) {
-          let h = `<div style="padding:12px 14px 4px;font-weight:600;font-size:12.5px" class="muted">Controls in B</div><table class="kv">`;
+          let h = `<div style="padding:12px 14px 4px;font-weight:600;font-size:12.5px" class="muted">${esc(T("Controls in B"))}</div><table class="kv">`;
           for (const c of fp) h += `<tr><td>${c.io === "indicator" ? "◀" : "▶"} ${esc(c.name)}</td><td class="faint">${esc(c.ctype_name || "")}</td></tr>`;
           list.insertAdjacentHTML("beforeend", h + "</table>");
         }
       } else if (currentTab === "deps") {
-        if (!diff.deps.length) list.innerHTML = `<div class="empty small">Dependencies (subVIs, typedefs, libraries) did not change.</div>`;
+        if (!diff.deps.length) list.innerHTML = `<div class="empty small">${esc(T("Dependencies (subVIs, typedefs, libraries) did not change."))}</div>`;
         for (const c of diff.deps) {
           const ic = ICON[c.kind];
-          list.insertAdjacentHTML("beforeend", `<div class="vd-item"><span class="st ${ic[0]}">${ic[1]}</span><div><div class="t">${esc(c.name)}</div><div class="d">${c.kind === "added" ? "added" : "removed"} · ${esc(c.link)}</div></div></div>`);
+          list.insertAdjacentHTML("beforeend", `<div class="vd-item"><span class="st ${ic[0]}">${ic[1]}</span><div><div class="t">${esc(c.name)}</div><div class="d">${c.kind === "added" ? T("added") : T("removed")} · ${esc(c.link)}</div></div></div>`);
         }
       } else if (currentTab === "props") {
         const mo = data.old.meta || {}, mn = data.new.meta || {};
-        let h = `<table class="kv"><tr><td>LabVIEW version</td><td>${esc(mo.lv_version_str || mo.lv_version || "—")} → ${esc(mn.lv_version_str || mn.lv_version || "—")}</td></tr>`;
-        if (data.old.stats && data.new.stats) h += `<tr><td>Nodes / wires</td><td>${data.old.stats.nodes}/${data.old.stats.wires} → ${data.new.stats.nodes}/${data.new.stats.wires}</td></tr>`;
+        let h = `<table class="kv"><tr><td>${esc(T("LabVIEW version"))}</td><td>${esc(mo.lv_version_str || mo.lv_version || "—")} → ${esc(mn.lv_version_str || mn.lv_version || "—")}</td></tr>`;
+        if (data.old.stats && data.new.stats) h += `<tr><td>${esc(T("Nodes / wires"))}</td><td>${data.old.stats.nodes}/${data.old.stats.wires} → ${data.new.stats.nodes}/${data.new.stats.wires}</td></tr>`;
         h += `</table>`;
-        if (!diff.props.length) h += `<div class="empty small">VI properties did not change.</div>`;
+        if (!diff.props.length) h += `<div class="empty small">${esc(T("VI properties did not change."))}</div>`;
         else {
           h += `<table class="kv">`;
           for (const p of diff.props.sort((a, b) => (b.important - a.important))) h += `<tr><td>${p.important ? "<b>" + esc(p.label) + "</b>" : esc(p.label)}</td><td class="old">${esc(p.old ?? "—")}</td><td class="new">${esc(p.new ?? "—")}</td></tr>`;
           h += `</table>`;
         }
-        if (mo.description !== mn.description) h += `<div style="padding:10px 14px"><b>Description changed</b><div class="small" style="white-space:pre-wrap;margin-top:6px"><span class="num-del">− ${esc(mo.description || "")}</span><br><span class="num-add">+ ${esc(mn.description || "")}</span></div></div>`;
+        if (mo.description !== mn.description) h += `<div style="padding:10px 14px"><b>${esc(T("Description changed"))}</b><div class="small" style="white-space:pre-wrap;margin-top:6px"><span class="num-del">− ${esc(mo.description || "")}</span><br><span class="num-add">+ ${esc(mn.description || "")}</span></div></div>`;
         list.innerHTML = h;
       }
       filterBox.style.display = currentTab === "bd" ? "" : "none";
@@ -454,18 +455,18 @@
     // icons
     const icons = side.querySelector(".vd-icons");
     if (icons) {
-      icons.innerHTML = (data.old.icon ? `<img src="${data.old.icon}" title="Icon of A">` : `<span class="faint small">—</span>`) +
-        `<span class="arrow">→</span>` + (data.new.icon ? `<img src="${data.new.icon}" title="Icon of B">` : `<span class="faint small">—</span>`) +
-        (data.old.icon && data.new.icon && data.old.icon !== data.new.icon ? `<span class="pill" style="color:var(--mod)">icon changed</span>` : "") +
-        `<span class="grow"></span><span class="small muted">${diff.functional} change${diff.functional === 1 ? "" : "s"}</span>`;
+      icons.innerHTML = (data.old.icon ? `<img src="${data.old.icon}" title="${esc(T("Icon of A"))}">` : `<span class="faint small">—</span>`) +
+        `<span class="arrow">→</span>` + (data.new.icon ? `<img src="${data.new.icon}" title="${esc(T("Icon of B"))}">` : `<span class="faint small">—</span>`) +
+        (data.old.icon && data.new.icon && data.old.icon !== data.new.icon ? `<span class="pill" style="color:var(--mod)">${esc(T("icon changed"))}</span>` : "") +
+        `<span class="grow"></span><span class="small muted">${T(diff.functional === 1 ? "{n} change" : "{n} changes", { n: diff.functional })}</span>`;
     }
     // file-level verdict: which section did the change happen in?
     const v = diff.verdict;
     if (v) {
-      const LV = { functional: "Content changed", layout: "Visual/layout only", saved: "Re-saved only" };
+      const LV = { functional: T("Content changed"), layout: T("Visual/layout only"), saved: T("Re-saved only") };
       let h = `<div class="verdict ${v.level}"><div class="vt">${LV[v.level]}</div>`;
       if (!v.parts.length || (v.parts.length === 1 && v.parts[0].key === "version"))
-        h += `<div class="small muted">Block diagram, front panel, connector pane, dependencies and settings are the same; only revision/compile information changed.</div>`;
+        h += `<div class="small muted">${esc(T("Block diagram, front panel, connector pane, dependencies and settings are the same; only revision/compile information changed."))}</div>`;
       for (const p of v.parts) h += `<div class="vp"><span class="part ${p.level}">${esc(p.label)}</span>${p.detail ? ` <span class="small">${esc(p.detail)}</span>` : ""}</div>`;
       side.querySelector(".head").insertAdjacentHTML("beforeend", h + "</div>");
     }
