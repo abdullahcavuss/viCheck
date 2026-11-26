@@ -19,7 +19,7 @@ WIRE = {"float": (255, 127, 0), "int": (31, 95, 214), "bool": (0, 138, 46), "str
         "path": (46, 139, 139), "cluster": (139, 90, 43), "refnum": (13, 107, 96), "variant": (123, 46, 138),
         "array": (68, 68, 68), "other": (59, 59, 59), "void": (154, 160, 166)}
 ST = {"added": (26, 127, 55), "removed": (207, 34, 46), "modified": (217, 119, 6), "moved": (47, 111, 235),
-      "reframed": (130, 80, 223)}
+      "reframed": (130, 80, 223), "typedef": (140, 149, 159), "minor": (168, 177, 187)}
 STRUCT = {"forLoop": (143, 148, 155), "whileLoop": (143, 148, 155), "timeLoop": (125, 138, 160),
           "select": (157, 161, 167), "eventStruct": (157, 161, 167), "commentNode": (110, 115, 120),
           "decomposeRecomposeStructure": (108, 141, 179)}

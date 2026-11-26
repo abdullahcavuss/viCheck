@@ -17,13 +17,27 @@
       <span class="grow"></span>
       <details class="report-box">
         <summary class="btn sm primary">📄 {{ _("Report with SVG images…") }}</summary>
-        <form method="post" action="{{ url_for('report_start') }}" class="report-form">
+        <form method="post" action="{{ url_for('report_start') }}" class="report-form" id="report-form">
           <input type="hidden" name="a" value="{{ a }}"><input type="hidden" name="b" value="{{ b }}">
           <div class="small muted" style="margin-bottom:6px">{{ _("A Markdown report: summary table, every changed VI with its change list and one SVG with the A and B block diagrams.") }}</div>
           <div class="small muted" style="margin:2px 0 2px">{{ _("Changes to include") }}</div>
           {% for k, t in categories %}
           <label class="chk"><input type="checkbox" name="cat" value="{{ k }}" {{ 'checked' if k in default_cats }}> {{ _(t) }}</label>
           {% endfor %}
+          {% set pickable = changes|selectattr("is_vi")|rejectattr("status", "equalto", "renamed")|list %}
+          {% if pickable %}
+          <div class="report-opts vi-pick-box">
+            <input type="hidden" name="vi_pick" value="1"><input type="hidden" name="vi_count" value="{{ pickable|length }}">
+            <div class="small muted" style="margin:2px 0 2px">{{ _("VIs in the report") }} · <b data-pick-count>{{ _("{n} / {m} VI selected", n=pickable|length, m=pickable|length) }}</b></div>
+            <div class="small faint" style="margin-bottom:4px">{{ _("Tick the VIs in the list below; only the ticked ones go into the report and the PDF.") }}</div>
+            <div class="row" style="gap:4px;flex-wrap:wrap">
+              <button type="button" class="btn sm" data-pick="all" title="{{ _("Select all VIs for the report") }}">{{ _("All") }}</button>
+              <button type="button" class="btn sm" data-pick="none">{{ _("None") }}</button>
+              <button type="button" class="btn sm" data-pick="visible" title="{{ _("Select only the VIs shown with the current filter") }}">{{ _("Visible only") }}</button>
+              <button type="button" class="btn sm" data-pick="functional" title="{{ _("Select only the VIs whose content changed") }}">{{ _("Content changes only") }}</button>
+            </div>
+          </div>
+          {% endif %}
           <div class="report-opts">
             <label class="chk"><input type="checkbox" name="pdf" value="1" checked> <b>{{ _("Also make a PDF") }}</b></label>
             <div class="small muted" style="margin:6px 0 2px">{{ _("Contents") }}</div>
@@ -31,6 +45,8 @@
             <label class="chk"><input type="checkbox" name="inc" value="lists" checked> {{ _("Change list of every VI") }}</label>
             <label class="chk" title="{{ _("The whole A and B block diagram in one SVG, fitted to the page") }}"><input type="checkbox" name="inc" value="overview" checked> {{ _("Whole diagram (A + B)") }}</label>
             <label class="chk" title="{{ _("For large VIs: a cropped A + B view of every group of nearby changes, printed at about 1:1") }}"><input type="checkbox" name="inc" value="details" checked> {{ _("Detail views around the changes") }}</label>
+            <label class="chk" title="{{ _("The front panel of A and B with the changed controls marked and numbered") }}"><input type="checkbox" name="inc" value="panel" checked> {{ _("Front panel (A + B)") }}</label>
+            <label class="chk" title="{{ _("Typedefs / globals whose structure changed while the value stayed the same. Off: not shown as differences.") }}"><input type="checkbox" name="inc" value="typedef"> {{ _("Typedef / global updates (value unchanged)") }}</label>
             <label class="chk" title="{{ _("Unreadable, out-of-scope and re-saved VIs, and the other changed files") }}"><input type="checkbox" name="inc" value="others" checked> {{ _("Other files and VIs") }}</label>
             <div class="small muted" style="margin:6px 0 2px">{{ _("Drawing") }}</div>
             <label class="chk" title="{{ _("Off: one image per Stacked Sequence frame that has changes (narrower, easier to read on a page)") }}"><input type="checkbox" name="flat" value="1"> {{ _("Stacked Sequence → Flat") }}</label>
@@ -63,6 +79,7 @@
   {% set fb = (b ~ '/' ~ c.path) if c.status != 'deleted' else '' %}
   <div class="ch">
     <div class="ch-row" {% if c.is_vi and c.status != "renamed" %}data-vi-row{% endif %}>
+      {% if c.is_vi and c.status != "renamed" %}<input type="checkbox" class="vi-pick" name="vi" value="{{ c.path }}" form="report-form" checked title="{{ _("Include in the report / PDF") }}">{% endif %}
       {{ status_badge(c.status, _) }}
       {{ icon(c.kind) }}
       <span class="path" title="{{ c.path }}">{% if c.old_path %}<span class="faint">{{ c.old_path }} → </span>{% endif %}{{ split_path(c.path) }}</span>

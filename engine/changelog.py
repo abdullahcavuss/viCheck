@@ -15,15 +15,18 @@ import zipfile
 
 from .files import diff_trees, is_vi, is_text, human_size
 from . import render, svgrender
-from .vi_diff import CATEGORIES, CHANGE_CATEGORY, change_cat
+from .vi_diff import apply_typedef_priority, CATEGORIES, CHANGE_CATEGORY, change_cat
 
-DEFAULT_CATS = ("logic", "fp")
+DEFAULT_CATS = ("logic", "fp", "typedef")
 
 # parts of the report that can be left out (PDF / Markdown):
 #   summary  summary tables          lists     change lists of every VI
 #   overview whole A + B diagram     details   cropped A + B views of the changes
 #   others   unreadable / out of scope / re-saved VIs and the other files
-INCLUDE_ALL = ("summary", "lists", "overview", "details", "others")
+#   panel    front panel of A and B with the numbered control changes
+#   typedef  typedef / global updates whose value did not change (off by default: not a real difference)
+INCLUDE_ALL = ("summary", "lists", "overview", "details", "panel", "others", "typedef")
+INCLUDE_DEFAULT = tuple(k for k in INCLUDE_ALL if k != "typedef")
 
 IMG_DIR = "changelog-images"
 
@@ -34,7 +37,7 @@ KIND_TXT = {
 }
 KIND_MARK = {"added": "🟩", "wire_added": "🟩", "note_added": "🟩",
              "removed": "🟥", "wire_removed": "🟥", "note_removed": "🟥",
-             "modified": "🟧", "wire_modified": "🟧", "moved": "🟦", "reframed": "🟪"}
+             "modified": "🟧", "wire_modified": "🟧", "moved": "🟦", "reframed": "🟪", "typedef": "⬜", "minor": "⬜"}
 FILE_TXT = {"added": "added", "deleted": "deleted", "modified": "modified", "renamed": "moved/renamed"}
 
 
@@ -133,9 +136,11 @@ def _prim_sub(text, names):
 
 
 def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_tiles=False, cats=None,
-             flat=True, details=False, include=None):
+             flat=True, details=False, include=None, typedef_mode="low", group=False, lang="en", only=None):
+    """only: set of VI paths to put in the report (None = every changed VI). The other VIs are left out
+    completely; the non-VI files are not affected."""
     cats = set(cats or DEFAULT_CATS)
-    inc = set(include) if include is not None else set(INCLUDE_ALL) - ({"details"} if not details else set())
+    inc = set(include) if include is not None else set(INCLUDE_DEFAULT) - ({"details"} if not details else set())
     head = store.get_commit(repo, head_ref)
     if head is None:
         raise ValueError("New version not found")
@@ -147,15 +152,24 @@ def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_t
     changes = diff_trees(base["tree"] if base else {}, head["tree"])
     vi_changes = [c for c in changes if is_vi(c["path"]) and c["status"] in ("added", "deleted", "modified")]
     other = [c for c in changes if c not in vi_changes]
+    vi_all = len(vi_changes)
+    if only is not None:
+        only = set(only)
+        vi_changes = [c for c in vi_changes if c["path"] in only]
     total = len(vi_changes)
 
-    functional, layout, saved, errors, excluded = [], [], [], [], []
+    functional, layout, saved, errors, excluded, tdonly, td_hidden = [], [], [], [], [], [], []
+    minor_only = []
     for i, c in enumerate(vi_changes, 1):
         if progress:
             progress(i - 1, total, c["path"])
         d = vis.diff(c.get("old_sha"), c.get("new_sha"), c["path"])
         verdict = d["diff"].get("verdict") or {"level": "functional", "parts": [], "cats": ["logic"]}
+        # typedef updates hidden from the report: classify them as their own (low) level, then leave such VIs out
+        verdict = apply_typedef_priority(verdict, typedef_mode if "typedef" in inc else "low")
         sel = [p for p in verdict["parts"] if p.get("cat", "other") in cats or p["key"] in ("error", "file")]
+        if "typedef" not in inc:
+            sel = [p for p in sel if p["level"] != "typedef"]
         item = {"c": c, "d": d, "verdict": verdict, "parts": sel,
                 "base_short": base["short"] if base else None, "head_short": head["short"],
                 "old_title": base.get("image_title") if base else None, "new_title": head.get("image_title")}
@@ -163,8 +177,25 @@ def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_t
             errors.append(item)
         elif verdict["level"] == "saved":
             (saved if "saved" in cats else excluded).append(item)
+        elif verdict["level"] == "minor":
+            # only differences the user does not count as changes (settings → change acceptance)
+            minor_only.append(item)
+            if "minor" in cats:
+                layout.append(item)
+        elif verdict["level"] == "typedef":
+            if "typedef" not in inc:
+                td_hidden.append(item)
+            else:
+                (tdonly if "typedef" in cats else excluded).append(item)
         elif not [p for p in sel if p["key"] != "version"]:
-            excluded.append(item)
+            # only hidden typedef updates were left: counted with them, not as out of scope
+            hid = "typedef" not in inc and any(p["level"] == "typedef" for p in verdict["parts"])
+            if hid:
+                td_hidden.append(item)
+            elif any(p["level"] == "minor" for p in verdict["parts"]):
+                minor_only.append(item)
+            else:
+                excluded.append(item)
         elif any(p["level"] == "functional" for p in sel):
             functional.append(item)
         else:
@@ -187,7 +218,8 @@ def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_t
 
     # ---- summary
     if "summary" in inc:
-        L.extend(_summary(functional, layout, saved, excluded, errors, other, cats, names))
+        L.extend(_summary(functional, layout, saved, excluded, errors, other, cats, names, tdonly, len(td_hidden),
+                          len(minor_only)))
 
     # ---- commits
     cl = commits_between(store, repo, base["id"] if base else None, head["id"])
@@ -216,7 +248,7 @@ def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_t
         for item in group:
             if progress:
                 progress(total, total, "images: " + item["c"]["path"])
-            L.extend(_vi_section(item, out_dir, names, all_tiles, cats, flat=flat, include=inc))
+            L.extend(_vi_section(item, out_dir, names, all_tiles, cats, flat=flat, include=inc, group=group, lang=lang))
 
     if errors and "others" in inc:
         L.append("## Unreadable VIs")
@@ -236,6 +268,17 @@ def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_t
             L.append("- `%s` — %s" % (item["c"]["path"], ", ".join(labels)))
         L.append("")
         L.append("</details>")
+        L.append("")
+
+    if tdonly:
+        L.append("## VIs where only typedefs / globals they use changed")
+        L.append("")
+        L.append("_A typedef (.ctl) or global variable used by these VIs changed and LabVIEW updated them; "
+                 "their own code and the values are the same._")
+        L.append("")
+        for item in tdonly:
+            what = "; ".join(p.get("detail") or p["label"] for p in item["verdict"]["parts"] if p["level"] == "typedef")
+            L.append("- `%s` — %s" % (item["c"]["path"], md_escape(_prim_sub(what, names))))
         L.append("")
 
     if saved and "others" in inc:
@@ -280,12 +323,13 @@ def generate(store, vis, repo, base_ref, head_ref, out_dir, progress=None, all_t
     md = "\n".join(L).rstrip() + "\n"
     with open(os.path.join(out_dir, "CHANGELOG.md"), "w", encoding="utf-8") as f:
         f.write(md)
-    return {"functional": len(functional), "layout": len(layout), "saved": len(saved),
+    return {"functional": len(functional), "layout": len(layout), "saved": len(saved), "typedef": len(tdonly),
+            "minor": len(minor_only),
             "errors": len(errors), "other": len(other), "commits": len(cl), "excluded": len(excluded),
-            "cats": sorted(cats)}
+            "cats": sorted(cats), "vi_selected": total, "vi_all": vi_all}
 
 
-def _summary(functional, layout, saved, excluded, errors, other, cats, names):
+def _summary(functional, layout, saved, excluded, errors, other, cats, names, tdonly=(), td_hidden=0, minor=0):
     L = []
     L.append("## Summary")
 
@@ -294,6 +338,13 @@ def _summary(functional, layout, saved, excluded, errors, other, cats, names):
     L.append("|---|---:|")
     L.append("| VIs with content changes | %d |" % len(functional))
     L.append("| VIs with visual/layout changes only | %d |" % len(layout))
+    if td_hidden:
+        L.append("| VIs where only typedefs / globals they use changed (value unchanged) — not shown | %d |" % td_hidden)
+    elif "typedef" in cats:
+        L.append("| VIs where only typedefs / globals they use changed (value unchanged) | %d |" % len(tdonly))
+    if minor:
+        L.append("| VIs with only differences not counted as changes%s | %d |" % (
+            "" if "minor" in cats else " — not shown", minor))
     if "saved" in cats:
         L.append("| VIs re-saved only | %d |" % len(saved))
     if excluded:
@@ -325,8 +376,9 @@ def _summary(functional, layout, saved, excluded, errors, other, cats, names):
     return L
 
 
-def _vi_section(item, out_dir, names, all_tiles, cats, flat=True, details=False, include=None):
-    inc = set(include) if include is not None else set(INCLUDE_ALL) - ({"details"} if not details else set())
+def _vi_section(item, out_dir, names, all_tiles, cats, flat=True, details=False, include=None, group=False, lang="en"):
+    inc = set(include) if include is not None else set(INCLUDE_DEFAULT) - ({"details"} if not details else set())
+    from . import story as ST
     c, d, verdict = item["c"], item["d"], item["verdict"]
     res = d["diff"]
     L = []
@@ -339,38 +391,72 @@ def _vi_section(item, out_dir, names, all_tiles, cats, flat=True, details=False,
     L.append("`%s` · %s" % (c["path"], status))
     L.append("")
     shown = [p for p in item["parts"] if p["key"] not in ("bd", "version", "bd_notes")
+             and ("typedef" in inc or p["level"] != "typedef")
              and not (p["key"] == "bd_layout" and any(ch["kind"] == "moved" for ch in res["changes"]))]
     for p in (shown if "lists" in inc else []):
         L.append("- **%s**%s" % (p["label"], (": " + md_escape(_prim_sub(p["detail"], names))) if p.get("detail") else ""))
     if shown:
         L.append("")
 
-    changes = [ch for ch in res["changes"] if change_cat(ch) in cats]
+    changes = [ch for ch in res["changes"] if change_cat(ch) in cats or (ch.get("cat") == "typedef" and "typedef" in inc)]
+    if "typedef" not in inc:
+        changes = [ch for ch in changes if ch.get("cat") != "typedef"]
     order = {"logic": 0, "auto": 1, "bd_layout": 2}
     changes.sort(key=lambda ch: (order.get(change_cat(ch), 0), bool(ch.get("reframe"))))  # frame-only moves last
     if c["status"] != "modified":
         changes = []  # in a new/deleted VI every item is "added/removed"; the image is enough instead of a list
+    # numbered entries: one per change, or one per group of related changes (main change first)
+    entries = []
+    if group:
+        allc = {c["id"]: c for c in res["changes"]}
+        inlist = {c["id"] for c in changes}
+        seen = set()
+        for ch in changes:
+            g = ch.get("group", ch["id"])
+            if g in seen:
+                continue
+            seen.add(g)
+            main = allc.get(g, ch)
+            members = [allc[i] for i in (main.get("group_members") or [main["id"]]) if i in inlist]
+            head = main if main["id"] in inlist else members[0]
+            entries.append((head, [m for m in members if m is not head], main.get("group_title"),
+                            [ST.render(it, lang) for it in main.get("gstory") or []]))
+    else:
+        entries = [(ch, [], None, [ST.render(it, lang) for it in ch.get("story") or []]) for ch in changes]
     if changes and "lists" in inc:
         L.append("**Block diagram changes**" if any(change_cat(ch) == "logic" for ch in changes)
                  else "**Block diagram layout changes**")
         L.append("")
-        for i, ch in enumerate(changes, 1):
-            t = _prim_sub(ch["title"], names)
-            line = "%d. %s %s" % (i, KIND_MARK.get("reframed" if ch.get("reframe") else ch["kind"], "•"), md_escape(t))
-            if ch.get("detail"):
+        for i, (ch, rest, gtitle, sents) in enumerate(entries, 1):
+            wireish = ch["kind"].startswith("wire") and sents and not gtitle
+            t = _prim_sub(sents[0] if wireish else (gtitle or ch["title"]), names)
+            line = "%d. %s %s" % (i, KIND_MARK.get(ch["cat"] if ch.get("cat") in ("typedef", "minor") else "reframed" if ch.get("reframe")
+                                                  else ch["kind"], "•"), md_escape(t))
+            if ch.get("detail") and not wireish:
                 line += " — %s" % md_escape(_prim_sub(ch["detail"], names))
             if ch.get("path"):
                 line += " _(%s)_" % md_escape(ch["path"])
+            if rest and not sents:
+                line += " · _+%d related: %s_" % (len(rest), _related_text(rest))
             L.append(line)
+            for s_ in (sents[1:] if wireish else sents):
+                L.append("    - %s" % md_escape(_prim_sub(s_, names)))
         L.append("")
 
-    # images
+    # images: every member of a group carries the group's number
     hn, ho, rn, ro = {}, {}, [], []
-    for i, ch in enumerate(changes, 1):
+    numbered = [(i, m) for i, (ch, rest, _, _s) in enumerate(entries, 1) for m in [ch] + rest]
+    for i, ch in numbered:
         k = ch["kind"]
         if ch.get("new_uid") and k == "moved":
             hn[ch["new_uid"]] = ("moved", i)
             rn.append((i, ch.get("new_reveal") or []))
+        if ch.get("cat") in ("typedef", "minor"):
+            for side, h, r in (("new", hn, rn), ("old", ho, ro)):
+                if ch.get(side + "_uid"):
+                    h[ch[side + "_uid"]] = (ch["cat"], i)
+                    r.append((i, ch.get(side + "_reveal") or []))
+            continue
         if ch.get("new_uid") and k in ("added", "modified", "wire_added", "wire_modified", "note_added"):
             hn[ch["new_uid"]] = ("added" if "added" in k else ("reframed" if ch.get("reframe") else "modified"), i)
             rn.append((i, ch.get("new_reveal") or []))
@@ -423,9 +509,70 @@ def _vi_section(item, out_dir, names, all_tiles, cats, flat=True, details=False,
         if views and "overview" in inc:
             L.append("_The image is an SVG: click to open it full size; it stays sharp when you zoom in the browser._")
             L.append("")
+    if "panel" in inc and "fp" in cats and c["status"] == "modified":
+        L.extend(_panel_section(d, res, base, out_dir, title, old_t, new_t, inc, cats))
     L.append("---")
     L.append("")
     return L
+
+
+def _related_text(rest):
+    n = {}
+    for m in rest:
+        k = ("wire(s)" if m["kind"].startswith("wire") else "typedef/global update(s)" if m.get("cat") == "typedef"
+             else "moved into/out of it" if m.get("reframe") else m["kind"])
+        n[k] = n.get(k, 0) + 1
+    order = ["added", "removed", "modified", "moved into/out of it", "typedef/global update(s)", "wire(s)"]
+    return ", ".join("%d %s" % (n[k], k) for k in order + sorted(set(n) - set(order)) if k in n)
+
+
+def _panel_section(d, res, base, out_dir, title, old_t, new_t, inc, cats=()):
+    """Front panel: numbered list of control changes and the A + B panels (one image per tab page with changes)."""
+    from . import fprender
+    L = []
+    mk = fprender.marks(d["old"], d["new"], res.get("fp"), res.get("accept"))
+    hide = ({"typedef"} if "typedef" not in inc else set()) | ({"minor"} if "minor" not in cats else set())
+    if hide:          # typedef updates with the value unchanged / differences not counted are not shown
+        mk = [m for m in mk if m["kind"] not in hide]
+        for k, m in enumerate(mk, 1):
+            m["num"] = k
+    od, nd = d["old"].get("fp_draw"), d["new"].get("fp_draw")
+    if not mk or not (od or nd):
+        return L
+    if "lists" in inc:
+        L.append("**Front panel changes**")
+        L.append("")
+        for m in mk:
+            L.append("%d. %s “%s” — %s" % (m["num"], KIND_MARK.get(m["kind"], "•"), md_escape(m["name"]), md_escape(m["detail"])))
+        L.append("")
+    try:
+        views = fprender.page_views(od, nd, mk)
+        L.append("**Front panel — previous and new version**")
+        L.append("")
+        for k, pv in enumerate(views, 1):
+            fn = "%s_fp%d.svg" % (base, k)
+            fprender.pair_svg(od, nd, mk, fn, old_t, new_t, pages=pv)
+            if len(views) > 1:
+                page = "; ".join("%s: %s" % (tab, _page_name(nd or od, tab, i)) for tab, i in pv.items())
+                L.append("_Front panel view %d%s_" % (k, (" — " + page + " page") if page else ""))
+                L.append("")
+            rel = os.path.relpath(fn, out_dir).replace(os.sep, "/").replace(" ", "%20")
+            L.append("[![%s — front panel](%s)](%s)" % (md_escape(title), rel, rel))
+            L.append("")
+    except Exception as e:
+        import logging
+        logging.exception("Could not render the front panel image")
+        L.append("> ⚠ Could not draw the front panel (%s: %s)." % (type(e).__name__, e))
+        L.append("")
+    return L
+
+
+def _page_name(model, tab, i):
+    from . import fprender
+    for c in fprender.walk(model["ctls"]):
+        if c["name"] == tab and c.get("pages") and i < len(c["pages"]):
+            return c["pages"][i]["name"] or "#%d" % (i + 1)
+    return "#%d" % (i + 1)
 
 
 def zip_dir(out_dir, zip_path, root_name="CHANGELOG"):

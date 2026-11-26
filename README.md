@@ -53,11 +53,47 @@ installed: Python, Flask and pylabview are inside the folder, and **LabVIEW is n
   `j`/`k` move through the changes.
 - **Two folders** → files are matched by relative path: modified, only in A, only in B, moved, and identical files.
   A summary for every VI (content / visual-layout / re-saved only). Text diff for text files.
+- **Related changes as one**: a node with the wires added/removed at it, the items moved into a new structure (or out
+  of a removed one), the updates caused by one typedef / global and wires whose type changed the same way are joined
+  into one change. The list shows the main change with "+N related", which unfolds; clicking it fits all of them.
+  "Diagram Disable → Case Structure" style swaps read "replaced by". Reports number such a group once. The grouping is
+  a heuristic, so it can be switched off: the *Join related changes* chip on the diff page or the home page setting.
+- **Wire changes in words**: instead of "Wire added", a wire change is told by the labels of what it connects —
+  *0 assigned to “Count”*, *“Stop” read and connected to “Exit”*, *output of “Read.vi” connected to “Scale.vi”*,
+  *100 given to “Wait.vi”* — following wires through structure tunnels. A group lists the sentences of all its
+  wires; a connection removed and added again (e.g. moved into a new structure) reads *rerouted*. The sentences are
+  in the list, in the report and in the PDF, in English or Turkish.
+- **Change acceptance**: the home page lists every kind of difference viCheck finds (items added / removed, wires,
+  wire data types, subVI updates, constant values, renames, frames, layout, front panel, connector pane,
+  dependencies, VI settings, icon …). Untick one and it is no longer counted as a change: it is still shown, faintly
+  (dotted gray, *not counted*), but a VI with only such differences is not shown as changed — it goes to its own
+  group in a folder comparison and is left out of reports. By default *Wire data type changed* and *SubVI updated*
+  (the same subVI, its connector / type / internal setting changed) are not counted. When everything else is
+  accepted, the data space and wire routing changes that follow from it are not counted either.
+- **Typedef / global updates**: when a typedef (.ctl) or global variable changes, LabVIEW updates every VI that uses
+  it. Such changes — typedef constants whose value stayed the same, refreshed global variable nodes, typedef controls
+  that changed with their typedef — are marked faintly (dotted gray, *typedef/global changed*) instead of orange. A
+  VI with nothing else changed gets its own level, *Only typedefs / globals it uses changed (value unchanged)*: a
+  separate group in a folder comparison, a row in the report summary, and a filter chip / report category to show
+  or hide them. If a typedef constant's value did change, it stays a content change, noted "(typedef changed too)".
+  The home page setting *Typedef / global variable updates* switches this low priority off (count them as changes).
+  In reports (Markdown / PDF) such updates are left out by default — not listed, not marked on the images, and VIs
+  with nothing else changed are only counted; tick *Typedef / global updates (value unchanged)* in the report
+  options to include them.
+- **Front panel**: the *Panel* tab of a VI diff shows the front panels of A and B side by side, drawn from the VI
+  file: controls, labels, colors, clusters, tab pages. Added / removed / modified controls and controls that were
+  only moved or resized are marked and numbered like on the block diagram; clicking a change opens its tab page and
+  zooms to it. LabVIEW's own bitmaps (button images, glyphs, graphs) are not stored in the VI, so those areas are
+  plain shapes. Reports and PDFs include the front panels too (*Front panel (A + B)*).
 - **SVG**
   - Right-click → **Inspect** in the window to look at the SVG elements, or **↗ Open in browser** and use F12.
   - **⬇ Save view as SVG**: saves the A + B view exactly as shown, as one SVG file.
   - **🖼 Export SVG**: draws the A and B diagrams with numbered change markers into SVG files (+ README.md).
   - In a folder comparison, **📄 Report with SVG images…**: a Markdown report with SVGs for every changed VI (also as ZIP).
+  - **Choosing the VIs for the report**: every VI row of a folder comparison has a checkbox; only the ticked VIs go into
+    the report and the PDF. *All*, *None*, *Visible only* (the VIs shown with the current filter) and *Content changes
+    only* tick them in one click, and the form shows how many are selected. When only some VIs are picked, the report
+    header says so (*n of m VIs*).
 - **PDF**: **📄 PDF** in a VI comparison, *Also make a PDF* in a folder report. The PDF is printed by Microsoft Edge,
   which comes with Windows; the SVGs stay vector graphics (sharp when zoomed, text can be searched). For every VI:
   - the list of changes and the whole A and B diagram in one image (side by side or one above the other, whichever
@@ -67,7 +103,7 @@ installed: Python, Flask and pylabview are inside the folder, and **LabVIEW is n
   - Stacked Sequences are shown frame by frame in the PDF by default (unfolded they get very wide and shrink on the
     page); *Stacked Sequence → Flat* is an option.
   - **Contents** are chosen when the report is made: summary tables, change lists, whole diagram, detail views,
-    other files. For one VI, the export page has the same choices and *↻ Generate again*.
+    front panel (A + B), typedef / global updates (off by default), other files. For one VI, the export page has the same choices and *↻ Generate again*.
 - **Sidebar**: in a VI comparison the file details at the top fold away with **▴ Hide**, giving the change list more room.
 - **Primitive names**: VI files store primitives only by number; the names come from the palettes of a LabVIEW
   installation. On first start viCheck reads them from the newest LabVIEW on the computer. If your VIs were made with
@@ -86,6 +122,16 @@ viCheck.exe --browser            (opens in the default browser instead of the wi
 ```
 
 The same command can be run from LabVIEW with *System Exec.vi*.
+
+## What's new in 1.1.0
+
+- Related changes joined into one (node + its wires, items moved into a new structure, one typedef's updates …),
+  with a switch to turn the grouping off.
+- Wire changes told in words, by the labels of what they connect (English and Turkish).
+- *Change acceptance* settings: choose which kinds of difference count as a change; uncounted ones are drawn faintly.
+- Typedef / global variable updates get their own low-priority level, group, filter and report option.
+- Front panel diff (*Panel* tab) drawn from the VI file, also in reports and PDFs.
+- Folder report: pick which VIs go into the report / PDF.
 
 ## What it can read
 
@@ -136,7 +182,7 @@ it. This way the exe is much smaller and the interface is still Chromium based.
 vicheck.py        launcher: window, command line, --pylabview / --pick helper modes
 app.py            web application (Flask): comparison, diff, SVG export, report
 i18n.py           interface languages (English source + Turkish translation; rules for engine texts)
-engine/           files.py (scan, hash, registry), lvtypes.py (type table + value decoder), vi_parser, vi_diff, render, svgrender (SVG + detail crops), changelog (report), pdfout (PDF) ...
+engine/           files.py (scan, hash, registry), lvtypes.py (type table + value decoder), vi_parser, vi_diff, render, svgrender (SVG + detail crops), fprender (front panel drawing), story (wire changes in words), changelog (report), pdfout (PDF) ...
 docs/             reverse-engineering.md — fields decoded from the VI format, with evidence (Turkish)
 tools/re/         format research scripts (event codes, shortcuts, heap diff, bulk regression)
 tools/check_i18n.py     checks that every interface text has a translation

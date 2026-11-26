@@ -28,12 +28,13 @@ from engine.files import (LocalStore, CompareError, diff_trees, file_kind, human
 from engine.service import VIService  # noqa: E402
 from engine import palettes, mdlite, pylv  # noqa: E402
 from engine import changelog as report_mod  # noqa: E402
-from engine import svgrender, pdfout  # noqa: E402
+from engine import svgrender, pdfout, fprender  # noqa: E402
 from engine.vi_diff import CATEGORIES  # noqa: E402
+from engine import vi_diff  # noqa: E402
 import i18n  # noqa: E402
 
 APP_NAME = "viCheck"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 
 def default_data_dir():
@@ -52,6 +53,7 @@ app.config["TEMPLATES_AUTO_RELOAD"] = True
 
 store = LocalStore(DATA_DIR)
 vis = VIService(store)
+vis.accept = (lambda acc: vi_diff.DEFAULT_ACCEPT if acc is None else frozenset(acc))(store.settings().get("accept"))
 
 # set by the launcher: "webview" (desktop window), "app" (Edge/Chrome app window) or "browser"
 UI = {"mode": "browser", "base_url": ""}
@@ -114,7 +116,8 @@ def inject_globals():
     lang = get_lang()
     return {"app_name": APP_NAME, "app_version": VERSION, "ui_mode": UI["mode"], "lang": lang,
             "langs": i18n.LANGS, "_": _, "_n": _n, "i18n_js": json.dumps(i18n.js_table(lang), ensure_ascii=False),
-            "show_welcome": not store.settings().get("welcome_seen"), "prim_status": prim_status}
+            "show_welcome": not store.settings().get("welcome_seen"), "prim_status": prim_status,
+            "group_changes": group_mode(), "accept_rules": vi_diff.ACCEPT_RULES, "accepted": accept_rules}
 
 
 def prim_status():
@@ -193,8 +196,52 @@ def index():
 
 @app.route("/settings", methods=["POST"])
 def save_settings():
-    store.save_settings(ignore=request.form.get("ignore", ""))
+    kw = {"ignore": request.form.get("ignore", "")}
+    if request.form.get("typedef_priority") in ("low", "normal"):
+        kw["typedef_priority"] = request.form["typedef_priority"]
+    if request.form.get("group_form") == "1":
+        kw["group_changes"] = request.form.get("group_changes") == "1"
+    if request.form.get("accept_form") == "1":
+        if request.form.get("reset"):
+            kw["accept"] = sorted(vi_diff.DEFAULT_ACCEPT)
+            kw["typedef_priority"] = "low"
+        else:
+            counted = set(request.form.getlist("count"))
+            kw["accept"] = sorted(k for k, lbl, g, d in vi_diff.ACCEPT_RULES if k not in counted)
+            kw["typedef_priority"] = "normal" if "typedef" in counted else "low"
+    store.save_settings(**kw)
+    vis.accept = accept_rules()
     return redirect(request.referrer or url_for("index"))
+
+
+def group_mode():
+    """Related changes (a node and its wires, items moved into a new structure …) shown as one change."""
+    return bool(store.settings().get("group_changes", True))
+
+
+@app.route("/api/setting", methods=["POST"])
+def api_setting():
+    """A single viewer option, saved from the page (only known keys)."""
+    j = request.get_json(silent=True) or {}
+    if j.get("key") == "group_changes":
+        store.save_settings(group_changes=bool(j.get("value")))
+        return jsonify({"ok": True})
+    return jsonify({"ok": False}), 400
+
+
+def accept_rules():
+    """Rule keys (vi_diff.ACCEPT_RULES) the user does not count as changes."""
+    acc = store.settings().get("accept")
+    if acc is None:
+        return vi_diff.DEFAULT_ACCEPT
+    known = {k for k, lbl, g, d in vi_diff.ACCEPT_RULES}
+    return frozenset(k for k in acc if k in known)
+
+
+def typedef_mode():
+    """'low': VIs where only typedefs / globals they use changed get their own low-priority level (default);
+    'normal': such changes count like any other change."""
+    return store.settings().get("typedef_priority", "low")
 
 
 @app.route("/recent/clear", methods=["POST"])
@@ -280,8 +327,33 @@ def api_vidiff():
         d = vis.diff(old, new, request.args.get("name", "x.vi"))
     except CompareError as e:
         return jsonify({"error": translate_message(str(e))}), 400
-    d = i18n.localize_diff(copy.deepcopy(d), get_lang())
+    d = copy.deepcopy(d)
+    d["diff"]["verdict"] = vi_diff.apply_typedef_priority(d["diff"].get("verdict"), typedef_mode())
+    if group_mode():
+        d["diff"]["verdict"] = vi_diff.note_groups(d["diff"]["verdict"], d["diff"]["changes"])
+    # the front panel drawing is served as SVG by /api/fp-svg; the viewer only needs the numbered changes
+    d["diff"]["fp_marks"] = fprender.marks(d["old"], d["new"], d["diff"].get("fp"), d["diff"].get("accept"))
+    d["has_fp_draw"] = bool(d["old"].get("fp_draw") or d["new"].get("fp_draw"))
+    for side in ("old", "new"):
+        d[side].pop("fp_draw", None)
+    d = i18n.localize_diff(d, get_lang())
     return Response(json.dumps(d, ensure_ascii=False), mimetype="application/json")
+
+
+@app.route("/api/fp-svg")
+def api_fp_svg():
+    """One front panel (side=old|new) as SVG, with the numbered changes of the A/B comparison."""
+    old = request.args.get("old") or None
+    new = request.args.get("new") or None
+    side = request.args.get("side", "new")
+    for s_ in (old, new):
+        if s_ and not store.has(s_):
+            return Response("", status=400)
+    d = vis.diff(old, new, request.args.get("name", "x.vi"))
+    mk = fprender.marks(d["old"], d["new"], d["diff"].get("fp"), d["diff"].get("accept"))
+    model = d["old" if side == "old" else "new"].get("fp_draw")
+    svg = fprender.side_svg(model, mk, side, empty_text=_("(not in this version)"))
+    return Response(svg, mimetype="image/svg+xml")
 
 
 @app.route("/api/visummary")
@@ -292,7 +364,12 @@ def api_visummary():
         if s and not store.has(s):
             return jsonify({"error": _("Unknown file — run the comparison again.")}), 400
     try:
-        return jsonify(i18n.localize_summary(vis.summary(old, new, request.args.get("name", "x.vi")), get_lang()))
+        s_ = vis.summary(old, new, request.args.get("name", "x.vi"))
+        v = vi_diff.apply_typedef_priority({"level": s_["level"], "parts": s_["parts"], "cats": s_["cats"]}, typedef_mode())
+        if group_mode():
+            v = vi_diff.note_groups(v, vis.diff(old, new, request.args.get("name", "x.vi"))["diff"]["changes"])
+        s_.update(level=v["level"], parts=v["parts"], cats=v["cats"])
+        return jsonify(i18n.localize_summary(s_, get_lang()))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -348,7 +425,7 @@ def export_svg():
     # PDF: Stacked Sequences frame by frame (unfolded they make very wide, tiny pages); SVG: as in the viewer
     flat = flag("flat", not want_pdf)
     # report contents: the options form sends inc=… for every ticked part (and inc_sent=1)
-    include = request.args.getlist("inc") if request.args.get("inc_sent") else list(report_mod.INCLUDE_ALL)
+    include = request.args.getlist("inc") if request.args.get("inc_sent") else list(report_mod.INCLUDE_DEFAULT)
     details = "details" in include
     old_sha = store.register(a) if a else None
     new_sha = store.register(b) if b else None
@@ -359,13 +436,16 @@ def export_svg():
     out = os.path.join(store.export_dir, jid)
     os.makedirs(os.path.join(out, report_mod.IMG_DIR), exist_ok=True)
     status = "modified" if (a and b) else ("added" if b else "deleted")
+    verdict = vi_diff.apply_typedef_priority(d["diff"].get("verdict") or {"level": "functional", "parts": []}, typedef_mode())
+    if group_mode():
+        verdict = vi_diff.note_groups(verdict, d["diff"]["changes"])
     item = {"c": {"path": name, "status": status, "old_sha": old_sha, "new_sha": new_sha},
-            "d": d, "verdict": d["diff"].get("verdict") or {"level": "functional", "parts": []},
-            "parts": (d["diff"].get("verdict") or {}).get("parts", []),
+            "d": d, "verdict": verdict, "parts": [p for p in verdict.get("parts", []) if p.get("cat") != "minor"],
             "base_short": "A", "head_short": "B", "old_title": "A", "new_title": "B"}
-    cats = set(c for c, _ in CATEGORIES)
+    cats = set(c for c, _ in CATEGORIES) - {"minor"}   # differences not counted as changes stay out of the report
     lang = get_lang()
-    lines = report_mod._vi_section(item, out, store.prim_names(), False, cats, flat=flat, include=include)
+    lines = report_mod._vi_section(item, out, store.prim_names(), False, cats, flat=flat, include=include,
+                                   group=group_mode(), lang=get_lang())
     img_dir = os.path.join(out, report_mod.IMG_DIR)
     svgs = sorted(f for f in os.listdir(img_dir) if f.endswith(".svg")) if os.path.isdir(img_dir) else []
     if not svgs and include and {"overview", "details"} & set(include):
@@ -468,13 +548,20 @@ def report_start():
     flat = request.form.get("flat") == "1"
     include = request.form.getlist("inc")
     details = "details" in include
+    # VIs ticked in the list (the form sends vi_pick=1 so that "none ticked" can be told from an old form)
+    only = set(request.form.getlist("vi")) if request.form.get("vi_pick") == "1" else None
+    if only is not None and not only and request.form.get("vi_count", "0") != "0":
+        raise CompareError(_("Select at least one VI for the report."))
     jid = "report-" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     out = os.path.join(store.export_dir, jid)
     os.makedirs(out, exist_ok=True)
     meta = {"id": jid, "a": a, "b": b, "running": True, "done": 0, "total": 0, "current": "", "error": None,
             "result": None, "cats": cats, "out": out, "pdf": None, "pdf_error": None,
-            "opts": {"pdf": want_pdf, "flat": flat, "details": details, "include": include}}
+            "opts": {"pdf": want_pdf, "flat": flat, "details": details, "include": include,
+                     "vi_selected": len(only) if only is not None else None}}
     REPORTS[jid] = meta
+    grp = group_mode()
+    tdm = typedef_mode()
     lang = get_lang()   # the worker thread has no request
 
     def run():
@@ -486,7 +573,8 @@ def report_start():
             def prog(d, t, cur):
                 meta.update(done=d, total=t, current=cur)
             meta["result"] = report_mod.generate(rs, vis, {"name": "viCheck"}, "A", "B", out, progress=prog, cats=cats,
-                                                 flat=flat, include=include)
+                                                 typedef_mode=tdm, group=grp, lang=lang,
+                                                 flat=flat, include=include, only=only)
             md_path = os.path.join(out, "CHANGELOG.md")
             with open(md_path, encoding="utf-8") as f:
                 md = f.read()
@@ -495,6 +583,9 @@ def report_start():
             head = i18n.REPORT_HEAD[lang].format(
                 a=a, b=b, now=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), ver=VERSION,
                 scope=", ".join(i18n.translate(t, lang) for k, t in CATEGORIES if k in cats))
+            res = meta["result"]
+            if only is not None and res.get("vi_selected", 0) < res.get("vi_all", 0):
+                head += i18n.REPORT_PICKED[lang].format(n=res["vi_selected"], m=res["vi_all"])
             report_md = head + i18n.report_markdown(body, lang)
             with open(os.path.join(out, "REPORT.md"), "w", encoding="utf-8") as f:
                 f.write(report_md)

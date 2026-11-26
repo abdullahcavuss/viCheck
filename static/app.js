@@ -37,9 +37,10 @@
     document.querySelectorAll("form[data-confirm]").forEach(f => f.addEventListener("submit", ev => { if (!confirm(f.dataset.confirm)) ev.preventDefault(); }));
 
     // ---- VI diff summaries (changes / commit / compare pages)
-    const LEVEL_TXT = { functional: T("Content changed"), layout: T("Visual/layout"), saved: T("Re-saved only") };
+    const LEVEL_TXT = { functional: T("Content changed"), layout: T("Visual/layout"), saved: T("Re-saved only"),
+                        typedef: T("Typedef / global updated"), minor: T("Not counted as a change") };
     const queue = [...document.querySelectorAll("[data-vi-summary]")];
-    const tally = { functional: 0, layout: 0, saved: 0, error: 0 };
+    const tally = { functional: 0, layout: 0, typedef: 0, minor: 0, saved: 0, error: 0 };
     let running = 0;
     function savedGroup(row) {
       const card = row.closest(".card");
@@ -52,17 +53,49 @@
       }
       return g;
     }
+    // VIs where only typedefs / globals they use changed: their own group, like the re-saved ones
+    function typedefGroup(row) {
+      const card = row.closest(".card");
+      let g = card.querySelector(".typedef-group");
+      if (!g) {
+        g = document.createElement("details");
+        g.className = "saved-group typedef-group";
+        g.innerHTML = '<summary><span class="sg-title"></span><span class="faint small">' + esc(T(" — only a typedef or global variable they use changed; LabVIEW updated them, the values are the same.")) + '</span></summary><div class="sg-body"></div>';
+        const sg = card.querySelector(".saved-group:not(.typedef-group)");
+        sg ? card.insertBefore(g, sg) : card.appendChild(g);
+      }
+      return g;
+    }
+    // VIs with only differences the user does not count as changes (settings → change acceptance)
+    function minorGroup(row) {
+      const card = row.closest(".card");
+      let g = card.querySelector(".minor-group");
+      if (!g) {
+        g = document.createElement("details");
+        g.className = "saved-group minor-group";
+        g.innerHTML = '<summary><span class="sg-title"></span><span class="faint small">' + esc(T(" — only differences that are not counted as changes (see Change acceptance in the settings).")) + '</span></summary><div class="sg-body"></div>';
+        const sg = card.querySelector(".saved-group:not(.typedef-group):not(.minor-group)");
+        sg ? card.insertBefore(g, sg) : card.appendChild(g);
+      }
+      return g;
+    }
     function updateTally() {
       const t = document.querySelector("[data-vi-tally]");
       if (t) {
         const parts = [];
         if (tally.functional) parts.push(`<span class="lv functional">${T("{n} VI content", { n: tally.functional })}</span>`);
         if (tally.layout) parts.push(`<span class="lv layout">${T("{n} VI visual/layout", { n: tally.layout })}</span>`);
+        if (tally.typedef) parts.push(`<span class="lv typedef">${T("{n} VI typedef/global update only", { n: tally.typedef })}</span>`);
+        if (tally.minor) parts.push(`<span class="lv minor">${T("{n} VI not counted as changed", { n: tally.minor })}</span>`);
         if (tally.saved) parts.push(`<span class="lv saved">${T("{n} VI re-saved only", { n: tally.saved })}</span>`);
         if (tally.error) parts.push(`<span class="lv functional">${T("{n} VI unreadable", { n: tally.error })}</span>`);
         t.innerHTML = parts.join(" ");
       }
-      document.querySelectorAll(".saved-group .sg-title").forEach(el => { const n = el.closest(".saved-group").querySelectorAll("[data-vi-row]").length; el.textContent = T("{n} VIs re-saved only", { n }); });
+      document.querySelectorAll(".saved-group .sg-title").forEach(el => {
+        const g = el.closest(".saved-group"), n = g.querySelectorAll("[data-vi-row]").length;
+        el.textContent = g.classList.contains("typedef-group") ? T("{n} VIs with typedef/global updates only", { n })
+          : g.classList.contains("minor-group") ? T("{n} VIs with differences not counted as changes", { n }) : T("{n} VIs re-saved only", { n });
+      });
     }
     function render(elx, s) {
       const row = elx.closest("[data-vi-row]");
@@ -85,6 +118,8 @@
       }
       if (row) { row._parts = s.parts || []; row.dataset.cats = (s.cats || []).join(" "); }
       paintRow(elx, row, s.parts || [], lv);
+      if (lv === "typedef" && row && row.dataset.viRow !== "keep") typedefGroup(row).querySelector(".sg-body").appendChild(row);
+      if (lv === "minor" && row && row.dataset.viRow !== "keep") minorGroup(row).querySelector(".sg-body").appendChild(row);
       updateTally();
       applyFilter();
     }
@@ -106,7 +141,7 @@
     }
 
     // ---- category filter
-    const CATS = [["logic", T("Block diagram logic")], ["bd_layout", T("Block diagram layout")], ["fp", T("Front panel")],
+    const CATS = [["logic", T("Block diagram logic")], ["typedef", T("Typedef / global updates")], ["minor", T("Not counted as changes")], ["bd_layout", T("Block diagram layout")], ["fp", T("Front panel")],
                   ["auto", T("Timed Loop / XNode internal settings")],
                   ["other", T("Other (icon, description, settings)")], ["saved", T("Re-saved only")]];
     let FILTER = {};
@@ -125,7 +160,7 @@
         if (elx && row._parts && row.dataset.level !== "saved") paintRow(elx, row, row._parts, row.dataset.level);
       });
       document.querySelectorAll(".saved-group").forEach(g => {
-        g.hidden = !isOn("saved");
+        g.hidden = g.classList.contains("typedef-group") || g.classList.contains("minor-group") ? !g.querySelector("[data-vi-row]:not([hidden])") : !isOn("saved");
         if (g.hidden) hidden += g.querySelectorAll("[data-vi-row]").length;
       });
       const info = document.querySelector("[data-filter-info]");
@@ -166,6 +201,33 @@
       }
     }
     next();
+
+    // ---- folder report: which VIs go into the report / PDF
+    const pickForm = document.getElementById("report-form");
+    if (pickForm && pickForm.querySelector("[data-pick-count]")) {
+      const picks = () => [...document.querySelectorAll("input.vi-pick")];
+      const cnt = pickForm.querySelector("[data-pick-count]");
+      const updPick = () => {
+        const all = picks(), n = all.filter(b => b.checked).length;
+        cnt.textContent = T("{n} / {m} VI selected", { n, m: all.length });
+        cnt.classList.toggle("none", n === 0);
+      };
+      const shown = row => !row.hidden && !(row.closest(".saved-group") && row.closest(".saved-group").hidden);
+      pickForm.querySelectorAll("[data-pick]").forEach(b => b.addEventListener("click", () => {
+        const how = b.dataset.pick;
+        picks().forEach(cb => {
+          const row = cb.closest("[data-vi-row]");
+          cb.checked = how === "all" ? true : how === "none" ? false
+            : how === "visible" ? shown(row) : row.dataset.level === "functional";
+        });
+        updPick();
+      }));
+      document.addEventListener("change", ev => { if (ev.target.classList && ev.target.classList.contains("vi-pick")) updPick(); });
+      pickForm.addEventListener("submit", ev => {
+        if (picks().length && !picks().some(b => b.checked)) { ev.preventDefault(); alert(T("Select at least one VI for the report.")); }
+      });
+      updPick();
+    }
 
     // ---- text diff toggle
     document.querySelectorAll("[data-textdiff]").forEach(btn => btn.addEventListener("click", async () => {

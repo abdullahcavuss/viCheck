@@ -37,7 +37,7 @@ THIRD_PARTY = os.path.join(os.path.dirname(HERE), "third_party", "pylabview")   
 
 VI_EXTENSIONS = (".vi", ".vit", ".ctl", ".ctt", ".vim")
 
-PARSER_VERSION = 20  # bump when the model format changes, to invalidate the cache
+PARSER_VERSION = 28  # bump when the model format changes, to invalidate the cache
 
 
 class VIParseError(Exception):
@@ -120,6 +120,7 @@ class TypeInfo:
         self.heap_name = {}  # heap id -> type name (from the comment)
         self.flat = {}       # flat id -> (type, elem flat id)
         self.inner_label = {}  # typedef flat id -> label of the inner control
+        self.td_name = {}      # typedef flat id -> typedef file name ("DialogType.ctl")
         self.top = {}        # consolidated index -> flat id
         self.tree = lvtypes.Types(main_xml_path)   # full type tree (cluster fields, flattened values)
         try:
@@ -151,6 +152,9 @@ class TypeInfo:
                     il = re.search(r'<TypeDesc Type="\w+"[^>]*?Label="([^"]*)"', span)
                     if il:
                         self.inner_label[fid] = il.group(1)
+                    tn = re.findall(r'<Label Text="([^"]*)"', span)
+                    if tn:
+                        self.td_name[fid] = ":".join(tn)      # qualified: "lv_icon.lvlib:Data.ctl"
                 self.flat[fid] = (attrs.get("Type", ""), elem, attrs.get("Label"), enum, inner_type)
             for m in re.finditer(r'<TypeDesc Index="(\d+)" FlatTypeID="(\d+)"', body):
                 self.top[int(m.group(1))] = int(m.group(2))
@@ -200,6 +204,17 @@ class TypeInfo:
         fid = self.top.get(cid) if cid is not None else None
         if fid is not None and fid in self.flat:
             return self.flat[fid][2] or self.inner_label.get(fid)
+        return None
+
+    def typedef_name(self, heap_type_text):
+        """'DialogType.ctl' if the heap type reference is a typedef, else None."""
+        m = re.search(r"(\d+)", heap_type_text or "")
+        if not m:
+            return None
+        cid = self.heap.get(int(m.group(1)))
+        fid = self.top.get(cid) if cid is not None else None
+        if fid is not None and fid in self.flat and self.flat[fid][0] == "TypeDef":
+            return self.td_name.get(fid) or "typedef"
         return None
 
     def selector_info(self, heap_type_text):
@@ -937,6 +952,14 @@ class BDWalker:
                         "cat": cat, "arr": arr, "raw": raw, "value": value, "vtype": tname,
                         "fmt": _format_hash(ddo),
                         "x": ox + l, "y": oy + t, "w": r - l, "h": bb - t, "terms": []}
+                td = self.types.typedef_name(dco.findtext("typeDesc"))
+                if td:
+                    node["td"] = td
+                    if raw and tname == "Cluster":
+                        try:
+                            node["vfields"] = self.types.tree.decode_fields(raw, dco.findtext("typeDesc"))
+                        except Exception:
+                            pass
                 x = node["x"] + node["w"]
                 y = node["y"] + node["h"] / 2.0
                 node["terms"].append({"uid": term.get("uid"), "idx": 0, "x": x, "y": y})
@@ -1232,6 +1255,12 @@ def parse_vi(vi_path, prim_names=None, keep_dir=None):
         fp_files = glob.glob(os.path.join(work, "vi_FPH*.xml"))
         fp_map = _parse_fp(fp_files[0]) if fp_files else {}
         model["fp"] = sorted(fp_map.values(), key=lambda c: (c["bounds"] or (0, 0))[:2])
+        try:
+            from . import fprender
+            model["fp_draw"] = fprender.parse_panel(fp_files[0]) if fp_files else None
+        except Exception as e:  # the drawing is optional; never fail the whole VI for it
+            model["fp_draw"] = None
+            model["warnings"].append("Front panel drawing: %s" % e)
         bd_files = glob.glob(os.path.join(work, "vi_BDH*.xml"))
         model["conpane"] = _parse_conpane(fp_files[0] if fp_files else None, fp_map)
         model["fingerprint"] = {

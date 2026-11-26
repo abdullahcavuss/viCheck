@@ -4,7 +4,7 @@
 {% block bodyclass %}fullscreen-app{% endblock %}
 {% block body %}
 <div class="vd" data-vi-diff data-old="{{ old_sha or '' }}" data-new="{{ new_sha or '' }}" data-fname="{{ fname }}"
-     data-old-label="{{ old_label }}" data-new-label="{{ new_label }}">
+     data-old-label="{{ old_label }}" data-new-label="{{ new_label }}" data-group="{{ '1' if group_changes else '0' }}">
   <aside class="vd-side">
     <div class="head">
       <div class="small row"><a href="{{ back_url }}" class="grow">← {{ back_label }}</a>
@@ -51,11 +51,15 @@
         <span><i style="border-color:#d97706;background:rgba(217,119,6,.14)"></i>{{ _("modified") }}</span>
         <span><i style="border-color:#8250df;background:rgba(130,80,223,.10)"></i>{{ _("other frame") }}</span>
         <span><i style="border-color:#2f6feb;border-style:dashed"></i>{{ _("moved") }}</span>
+        <span title="{{ _("Only a typedef or global variable it uses changed; LabVIEW updated the VI, the value is the same") }}"><i style="border-color:#8c959f;border-style:dotted;background:rgba(140,149,159,.08)"></i>{{ _("typedef/global changed") }}</span>
+        <span title="{{ _("A difference that is not counted as a change (Change acceptance in the settings)") }}"><i style="border-color:#a8b1bb;border-style:dotted;background:rgba(168,177,187,.07)"></i>{{ _("not counted") }}</span>
       </span>
     </div>
     <div class="panes" style="position:relative">
       <div class="pane old"></div>
       <div class="pane new"></div>
+      <div class="pane fpv old" hidden></div>
+      <div class="pane fpv new" hidden></div>
       <div class="loading-overlay"><span class="spinner"></span><span>{{ _("Parsing and comparing the VIs with pylabview…") }}</span><span class="small faint">{{ _("The first time may take a few seconds; the result is cached.") }}</span></div>
     </div>
   </section>

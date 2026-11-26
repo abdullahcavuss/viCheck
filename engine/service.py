@@ -1,5 +1,6 @@
 """Service that builds VI models and their diffs and caches them."""
 import copy
+import hashlib
 import json
 import os
 import tempfile
@@ -30,6 +31,7 @@ class VIService:
         self.diff_dir = os.path.join(store.cache_dir, "diffs")
         os.makedirs(self.model_dir, exist_ok=True)
         os.makedirs(self.diff_dir, exist_ok=True)
+        self.accept = vi_diff.DEFAULT_ACCEPT     # rule keys not counted as changes (settings)
 
     def model(self, sha, filename="file.vi"):
         if not sha:
@@ -63,7 +65,10 @@ class VIService:
                 shutil.rmtree(tmpdir, ignore_errors=True)
 
     def diff(self, old_sha, new_sha, filename="file.vi"):
-        key = "%s_%s.v%d.json" % (old_sha or "none", new_sha or "none", vi_parser.PARSER_VERSION)
+        acc = frozenset(self.accept)
+        # the accepted rules change the result, so they are part of the cache key
+        tag = hashlib.md5(",".join(sorted(acc)).encode()).hexdigest()[:8] if acc else "all"
+        key = "%s_%s.v%d.%s.json" % (old_sha or "none", new_sha or "none", vi_parser.PARSER_VERSION, tag)
         cache = os.path.join(self.diff_dir, key)
         with _lock_for(cache):
             if os.path.exists(cache):
@@ -71,7 +76,7 @@ class VIService:
                     return json.load(f)
         old = self.model(old_sha, filename)
         new = self.model(new_sha, filename)
-        res = vi_diff.diff_models(old, new)
+        res = vi_diff.diff_models(old, new, acc)
         out = {"old": old, "new": new, "diff": res}
         with _lock_for(cache):
             tmp = cache + ".tmp"

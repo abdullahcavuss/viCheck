@@ -1,5 +1,5 @@
 ; viCheck installer (Inno Setup 6, https://jrsoftware.org/isinfo.php)
-; Built by build.bat after PyInstaller:  ISCC.exe /DAppVersion=1.0.0 installer\viCheck.iss
+; Built by build.bat after PyInstaller:  ISCC.exe /DAppVersion=1.1.0 installer\viCheck.iss
 ; Output: dist\viCheck-Setup-<version>.exe
 ;
 ; - Installs for the current user without administrator rights (the setup offers "all users" too).
@@ -7,7 +7,7 @@
 ; - Settings and cache (%LOCALAPPDATA%\viCheck) are kept when uninstalling.
 
 #ifndef AppVersion
-  #define AppVersion "1.0.0"
+  #define AppVersion "1.1.0"
 #endif
 #define AppName "viCheck"
 #define AppExe "viCheck.exe"

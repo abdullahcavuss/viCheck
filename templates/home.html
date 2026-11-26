@@ -65,6 +65,33 @@
       </form>
     </div>
     <div class="card">
+      <div class="card-head"><b>{{ _("Change acceptance") }}</b></div>
+      <form class="card-body accept-form" method="post" action="{{ url_for('save_settings') }}">
+        <input type="hidden" name="ignore" value="{{ settings.ignore }}"><input type="hidden" name="accept_form" value="1">
+        <div class="hint" style="margin:0 0 6px">{{ _("Everything viCheck finds as a difference. Ticked: counted as a change. Unticked: still shown, faintly, but a VI with only such differences is not shown as changed.") }}</div>
+        {% set acc = accepted() %}
+        {% set groups = [("bd", _("Block diagram")), ("fp", _("Front panel")), ("vi", _("VI"))] %}
+        {% for g, gname in groups %}
+        <div class="acc-group">{{ gname }}</div>
+        {% for k, lbl, grp, dflt in accept_rules if grp == g %}
+        <label class="chk" title="{{ _('Counted by default') if dflt else _('Not counted by default') }}"><input type="checkbox" name="count" value="{{ k }}" {{ 'checked' if k not in acc }} onchange="this.form.submit()"> {{ _(lbl) }}</label>
+        {% endfor %}
+        {% if g == "vi" %}
+        <label class="chk" title="{{ _("When a typedef (.ctl) or global variable changes, LabVIEW updates every VI that uses it. Unticked: such VIs get their own low-priority group and the updates are drawn faintly (“typedef/global changed”).") }}"><input type="checkbox" name="count" value="typedef" {{ 'checked' if settings.typedef_priority == 'normal' }} onchange="this.form.submit()"> {{ _("Typedef / global it uses changed (value unchanged)") }}</label>
+        {% endif %}
+        {% endfor %}
+        <button class="btn sm" name="reset" value="1" style="margin-top:8px">{{ _("Defaults") }}</button>
+      </form>
+    </div>
+    <div class="card">
+      <div class="card-head"><b>{{ _("Related changes") }}</b></div>
+      <form class="card-body" method="post" action="{{ url_for('save_settings') }}">
+        <input type="hidden" name="ignore" value="{{ settings.ignore }}"><input type="hidden" name="group_form" value="1">
+        <div class="hint" style="margin:0 0 6px">{{ _("Show related changes as one change: a node with its wires, items moved into a new structure, the updates of one typedef, wires whose type changed the same way.") }}</div>
+        <label class="chk"><input type="checkbox" name="group_changes" value="1" {{ 'checked' if group_changes }} onchange="this.form.submit()"> {{ _("Join related changes (switch off if the grouping looks wrong)") }}</label>
+      </form>
+    </div>
+    <div class="card">
       <div class="card-body small muted">
         <b style="color:var(--text)">{{ _("Tips") }}</b>
         <ul style="padding-left:18px;margin:8px 0 0">

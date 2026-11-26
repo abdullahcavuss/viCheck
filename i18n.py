@@ -127,6 +127,19 @@ TR.update({
     "Hide": "Gizle",
     "Details": "Ayrıntılar",
     "Also make a PDF": "PDF de oluştur",
+    "VIs in the report": "Rapora girecek VI'lar",
+    "Tick the VIs in the list below; only the ticked ones go into the report and the PDF.":
+        "Aşağıdaki listede VI'ları işaretleyin; rapora ve PDF'e yalnızca işaretli olanlar girer.",
+    "{n} / {m} VI selected": "{n} / {m} VI seçili",
+    "All": "Tümü",
+    "None": "Hiçbiri",
+    "Visible only": "Yalnızca görünenler",
+    "Content changes only": "Yalnızca içeriği değişenler",
+    "Select all VIs for the report": "Rapor için tüm VI'ları seç",
+    "Select only the VIs shown with the current filter": "Yalnızca mevcut filtreyle görünen VI'ları seç",
+    "Select only the VIs whose content changed": "Yalnızca içeriği değişen VI'ları seç",
+    "Include in the report / PDF": "Rapora / PDF'e dahil et",
+    "Select at least one VI for the report.": "Rapor için en az bir VI seçin.",
     "For large VIs: a cropped A + B view of every group of nearby changes, printed at about 1:1":
         "Büyük VI'lar için: birbirine yakın her değişiklik grubunun kırpılmış A + B görünümü, yaklaşık 1:1 ölçekte",
     "Detail views around the changes": "Değişikliklerin detay görünümleri",
@@ -135,6 +148,46 @@ TR.update({
     "Stacked Sequence → Flat": "Stacked Sequence → Flat",
     "Open PDF": "PDF'i aç",
     "Contents": "İçerik",
+    "Typedefs / globals whose structure changed while the value stayed the same. Off: not shown as differences.":
+        "Yapısı değişmiş ama değeri aynı kalmış typedef / globaller. Kapalıysa fark olarak gösterilmez.",
+    "Typedef / global updates (value unchanged)": "Typedef / global güncellemeleri (değer aynı)",
+    "{n} added": "{n} eklendi",
+    "{n} removed": "{n} silindi",
+    "{n} modified": "{n} değişti",
+    "{n} moved into/out of it": "{n} içine/dışına taşındı",
+    "{n} typedef/global update(s)": "{n} typedef/global güncellemesi",
+    "{n} wire(s)": "{n} tel",
+    "+{n} related: ": "+{n} bağlı: ",
+    "Show related changes (a node with its wires, items moved into a new structure, updates of one typedef …) as one change":
+        "Bağlı değişiklikleri (bir düğüm ve telleri, yeni bir yapıya taşınan öğeler, bir typedef'in güncellemeleri …) tek değişiklik olarak göster",
+    "Join related changes": "Bağlı değişiklikleri birleştir",
+    "Related changes": "Bağlı değişiklikler",
+    "Show related changes as one change: a node with its wires, items moved into a new structure, the updates of one typedef, wires whose type changed the same way.":
+        "Bağlı değişiklikleri tek değişiklik olarak göster: bir düğüm ve telleri, yeni bir yapıya taşınan öğeler, bir typedef'in güncellemeleri, tipi aynı şekilde değişen teller.",
+    "Join related changes (switch off if the grouping looks wrong)": "Bağlı değişiklikleri birleştir (gruplama yanlış görünürse kapatın)",
+    "A typedef / global it uses changed": "Kullandığı typedef / global değişti",
+    "Typedef / global it uses changed": "Kullandığı typedef / global değişti",
+    "Only typedefs / globals it uses changed (value unchanged)": "Sadece kullandığı typedef / global değişti (değer aynı)",
+    "Only a typedef or global variable it uses changed; LabVIEW updated the VI, the value is the same":
+        "Sadece kullandığı bir typedef ya da global değişken değişti; LabVIEW VI'ı güncelledi, değer aynı",
+    "typedef/global changed": "typedef/global değişti",
+    "Typedef / global updated": "Typedef / global güncellendi",
+    " — only a typedef or global variable they use changed; LabVIEW updated them, the values are the same.":
+        " — sadece kullandıkları bir typedef ya da global değişken değişti; LabVIEW güncelledi, değerler aynı.",
+    "{n} VI typedef/global update only": "{n} VI sadece typedef/global güncellemesi",
+    "{n} VIs with typedef/global updates only": "{n} VI sadece typedef/global güncellemesi",
+    "Typedef / global updates": "Typedef / global güncellemeleri",
+    "Typedef / global variable updates": "Typedef / global değişken güncellemeleri",
+    "When a typedef (.ctl) or global variable changes, LabVIEW updates every VI that uses it. If a VI's own code and values stayed the same:":
+        "Bir typedef (.ctl) ya da global değişken değişince LabVIEW onu kullanan her VI'ı günceller. VI'ın kendi kodu ve değerleri aynı kaldıysa:",
+    "Low priority: own group, drawn faintly (“typedef/global changed”)": "Düşük öncelik: ayrı grup, silik renkle (“typedef/global değişti”)",
+    "Count as changes, like other modifications": "Diğer değişiklikler gibi değişiklik say",
+    "The front panel of A and B with the changed controls marked and numbered": "A ve B ön paneli; değişen kontroller işaretli ve numaralı",
+    "Front panel (A + B)": "Ön panel (A + B)",
+    "The <i>Panel</i> tab shows the front panels of A and B with the changed controls marked the same way.":
+        "<i>Panel</i> sekmesi A ve B ön panellerini, değişen kontroller aynı şekilde işaretlenmiş olarak gösterir.",
+    "No front panel control was added, removed, changed or moved.": "Ön panelde eklenen, silinen, değişen ya da taşınan kontrol yok.",
+    "(not in this version)": "(bu sürümde yok)",
     "Changes to include": "Dahil edilecek değişiklikler",
     "Drawing": "Çizim",
     "Summary tables": "Özet tabloları",
@@ -371,6 +424,62 @@ def detect(accept_language):
     return DEFAULT
 
 
+# change acceptance (settings) and differences not counted as changes
+TR.update({
+    "Change acceptance": "Değişim kabul seçenekleri",
+    "Everything viCheck finds as a difference. Ticked: counted as a change. Unticked: still shown, faintly, but a VI with only such differences is not shown as changed.":
+        "viCheck'in fark olarak bulduğu her şey. İşaretli: değişiklik sayılır. İşaretsiz: yine gösterilir ama silik; sadece bu tür farkları olan VI değişmiş görünmez.",
+    "Counted by default": "Varsayılan: değişiklik sayılır",
+    "Not counted by default": "Varsayılan: değişiklik sayılmaz",
+    "Defaults": "Varsayılanlar",
+    "VI": "VI",
+    "Typedef / global it uses changed (value unchanged)": "Kullandığı typedef / global değişti (değer aynı)",
+    "When a typedef (.ctl) or global variable changes, LabVIEW updates every VI that uses it. Unticked: such VIs get their own low-priority group and the updates are drawn faintly (“typedef/global changed”).":
+        "Bir typedef (.ctl) ya da global değişken değişince LabVIEW onu kullanan her VI'ı günceller. İşaretsiz: bu VI'lar ayrı, düşük öncelikli grupta olur ve güncellemeler silik çizilir (“typedef/global değişti”).",
+    "Not counted as a change": "Değişiklik sayılmadı",
+    "Not counted as changes": "Değişiklik sayılmayanlar",
+    "Differences not counted as changes": "Değişiklik sayılmayan farklar",
+    "Only differences not counted as changes": "Sadece değişiklik sayılmayan farklar",
+    "not counted": "sayılmadı",
+    "A difference that is not counted as a change (Change acceptance in the settings)":
+        "Değişiklik sayılmayan bir fark (ayarlarda Değişim kabul seçenekleri)",
+    " — only differences that are not counted as changes (see Change acceptance in the settings).":
+        " — sadece değişiklik sayılmayan farklar var (ayarlarda Değişim kabul seçenekleri).",
+    "{n} VI not counted as changed": "{n} VI değişmiş sayılmadı",
+    "{n} VIs with differences not counted as changes": "{n} VI'da sadece değişiklik sayılmayan farklar",
+    "{n} not counted as change(s)": "{n} sayılmayan fark",
+    # the rules
+    "Item added (node, subVI, structure, constant…)": "Öğe eklendi (düğüm, subVI, yapı, sabit…)",
+    "Item removed": "Öğe silindi",
+    "Wire added": "Tel eklendi",
+    "Wire removed": "Tel silindi",
+    "Wire data type changed": "Tel veri tipi değişti",
+    "SubVI updated (same subVI; its connector, type or internal setting changed)":
+        "SubVI güncellendi (aynı subVI; konnektörü, tipi veya iç ayarı değişti)",
+    "SubVI replaced or renamed (another VI is called)": "SubVI değiştirildi / yeniden adlandırıldı (başka bir VI çağrılıyor)",
+    "Constant value changed": "Sabit değeri değişti",
+    "Item renamed (label, variable, node name)": "Öğe yeniden adlandırıldı (etiket, değişken, düğüm adı)",
+    "Terminal count of a node / structure changed": "Düğüm / yapı terminal sayısı değişti",
+    "Node setting / property / type changed": "Düğüm ayarı / özelliği / tipi değişti",
+    "Read ↔ write, control ↔ indicator": "Okuma ↔ yazma, kontrol ↔ gösterge",
+    "Structure frames added / removed / reordered": "Yapı çerçeveleri eklendi / silindi / sırası değişti",
+    "Item moved into another structure / frame": "Öğe başka bir yapıya / çerçeveye taşındı",
+    "Block diagram layout (moved, resized, text format, wire routing)": "Blok diyagram yerleşimi (taşıma, boyut, yazı biçimi, tel yolları)",
+    "Block diagram comments added / removed": "Blok diyagram yorumları eklendi / silindi",
+    "Block diagram changes without details": "Ayrıntısı alınamayan blok diyagram farkları",
+    "Front panel controls added / removed / changed": "Ön panel kontrolleri eklendi / silindi / değişti",
+    "Front panel appearance / control properties": "Ön panel görünümü / kontrol özellikleri",
+    "Front panel layout (moved, resized)": "Ön panel yerleşimi (taşıma, boyut)",
+    "Connector pane": "Konnektör paneli",
+    "Dependencies added / removed": "Bağımlılıklar eklendi / silindi",
+    "Important VI properties (reentrancy, priority …)": "Önemli VI özellikleri (reentrancy, öncelik …)",
+    "Other VI settings": "Diğer VI ayarları",
+    "Default values / data space": "Varsayılan değerler / veri alanı",
+    "Icon": "İkon",
+    "VI description": "VI açıklaması",
+    "Block diagram differences not counted as changes": "Blok diyagramda değişiklik sayılmayan farklar",
+})
+
 def translate(text, lang, **values):
     if lang == "tr":
         text = TR.get(text, text)
@@ -399,6 +508,8 @@ _LABELS_TR = {
     "Block diagram layout": "Blok diyagram yerleşimi",
     "Block diagram (details not available)": "Blok diyagram (ayrıntı yok)",
     "Typedef update": "Typedef güncellemesi",
+    "Typedef/global used on the block diagram changed": "Blok diyagramda kullanılan typedef/global değişti",
+    "Typedef used on the front panel changed": "Ön panelde kullanılan typedef değişti",
     "Front panel controls": "Ön panel kontrolleri",
     "Front panel appearance": "Ön panel görünümü",
     "Front panel layout": "Ön panel yerleşimi",
@@ -433,6 +544,23 @@ _KIND_TR = [  # "<Kind> “" at the start of a title
 
 # whole-string or phrase rules, applied in order (regex, replacement)
 _RULES_TR = [
+    # related changes joined
+    (r"\b(\d+) wire\(s\)", r"\1 tel"),
+    (r"(?<=[ :,])(\d+) added(?![a-z])", r"\1 eklendi"), (r"(?<=[ :,])(\d+) removed(?![a-z])", r"\1 silindi"),
+    (r"(?<=[ :,])(\d+) modified(?![a-z])", r"\1 değişti"),
+    (r"“([^”]*)” replaced by “([^”]*)”", r"“\1”, “\2” ile değiştirildi"),
+    (r"(\d+) change\(s\), related ones joined \((\d+) items\) · ", r"\1 değişiklik, bağlı olanlar birleşik (\2 öğe) · "),
+    # typedef / global updates
+    (r"(”(?: \([^)]*\))?) — typedef/global updated", r"\1 — typedef/global güncellendi"),
+    (r"the typedef “([^”]*)” it uses changed, value unchanged", r"kullandığı typedef “\1” değişti, değer aynı"),
+    (r"the global “([^”]*)” it uses changed", r"kullandığı global “\1” değişti"),
+    (r"the type of “([^”]*)” changed", r"“\1” tipi değişti"),
+    (r" \(typedef “([^”]*)” changed too\)", r" (typedef “\1” de değişti)"),
+    (r"\bthe typedef it uses changed\b", "kullandığı typedef değişti"),
+    (r"(\d+) item\(s\), value unchanged: ", r"\1 öğe, değer aynı: "),
+    (r" — the typedef \(\.ctl\) changed, LabVIEW updated the VI", " — typedef (.ctl) değişti, LabVIEW VI'ı güncelledi"),
+    (r" — the typedef \(\.ctl\) changed", " — typedef (.ctl) değişti"),
+    (r"\bfollows the typedef update\b", "typedef güncellemesinden"),
     # change titles: the verb follows the closing quote of the name (or the variable's owner)
     (r"(”(?: \([^)]*\))?) moved into another structure/frame", r"\1 başka bir yapıya/çerçeveye taşındı"),
     (r"(”(?: \([^)]*\))?) text format changed", r"\1 yazı biçimi değişti"),
@@ -485,7 +613,21 @@ _RULES_TR = [
     (r"^e\.g\. property node item, label visibility, structure setting$", "ör. property node öğesi, etiket görünürlüğü, yapı ayarı"),
     (r" — source \.ctl changed, VI re-saved$", " — kaynak .ctl değişti, VI yeniden kaydedildi"),
     (r"\bpattern changed\b", "desen değişti"),
+    # differences not counted as changes
+    (r" — not counted as a change$", " — değişiklik sayılmadı"),
+    (r"^not counted as a change$", "değişiklik sayılmadı"),
+    (r"^follows the differences not counted as changes$", "değişiklik sayılmayan farklardan kaynaklanıyor"),
+    (r"(?:(?<=^)|(?<=; ))([A-Z][^:;]*): (\d+)(?=;|$)",
+     lambda m: "%s: %s" % (TR.get(m.group(1), _short_tr(m.group(1))), m.group(2))),
 ]
+def _short_tr(short):
+    """A rule's short name ("SubVI updated") from its full label's translation."""
+    for en, tr in TR.items():
+        if en.startswith(short + " (") and " (" in tr:
+            return tr.split(" (")[0]
+    return short
+
+
 _RULES_TR = [(re.compile(p), r) for p, r in _RULES_TR]
 
 
@@ -516,14 +658,28 @@ def localize_summary(summary, lang):
 
 def localize_diff(d, lang):
     """d = {"old", "new", "diff"} as returned by VIService.diff (a copy; it is changed in place)."""
+    from engine import story as _st
+    r = d["diff"]
+    for c in r.get("changes", []):   # the wire sentences are written in every language
+        if c.get("story"):
+            c["story_text"] = [_st.render(it, lang) for it in c["story"]]
+        if c.get("gstory"):
+            c["gstory_text"] = [_st.render(it, lang) for it in c["gstory"]]
     if lang != "tr":
         return d
-    r = d["diff"]
     for c in r.get("changes", []):
         c["title"] = engine_text(c.get("title"), lang)
+        if c.get("group_title"):
+            c["group_title"] = engine_text(c["group_title"], lang)
         c["detail"] = engine_text(c.get("detail"), lang)
     for c in r.get("fp", []):
         c["detail"] = engine_text(c.get("detail"), lang)
+    for c in r.get("fp_marks", []):
+        if c["kind"] == "moved":
+            c["detail"] = " / ".join({"moved": "taşındı", "resized": "boyutu değişti"}.get(w, w)
+                                     for w in (c.get("detail") or "").split(" / "))
+        else:
+            c["detail"] = engine_text(c.get("detail"), lang)
     for p in r.get("props", []):
         p["label"] = engine_text(p.get("label"), lang)
     v = r.get("verdict")
@@ -586,6 +742,22 @@ _REPORT_TR = [  # (English, Turkish) fixed sentences of the report generator, lo
     (" more lines)", " satır daha)"),
     ("_View ", "_Görünüm "),
     ("_Detail ", "_Detay "),
+    ("**Front panel changes**", "**Ön panel değişiklikleri**"),
+    (" related: ", " bağlı: "),
+    (" moved into/out of it", " içine/dışına taşındı"), (" typedef/global update(s)", " typedef/global güncellemesi"),
+    ("## VIs where only typedefs / globals they use changed", "## Sadece kullandığı typedef / global değişen VI'lar"),
+    ("_A typedef (.ctl) or global variable used by these VIs changed and LabVIEW updated them; their own code and the values are the same._",
+     "_Bu VI'ların kullandığı bir typedef (.ctl) ya da global değişken değişti ve LabVIEW onları güncelledi; kendi kodları ve değerleri aynı._"),
+    ("| VIs where only typedefs / globals they use changed (value unchanged) — not shown |", "| Sadece kullandığı typedef / global değişen VI'lar (değer aynı) — gösterilmedi |"),
+    ("| VIs where only typedefs / globals they use changed (value unchanged) |", "| Sadece kullandığı typedef / global değişen VI'lar (değer aynı) |"),
+    ("| VIs with only differences not counted as changes — not shown |", "| Sadece değişiklik sayılmayan farkları olan VI'lar — gösterilmedi |"),
+    ("| VIs with only differences not counted as changes |", "| Sadece değişiklik sayılmayan farkları olan VI'lar |"),
+    ("**Front panel — previous and new version**", "**Ön panel — önceki ve yeni sürüm**"),
+    ("_Front panel view ", "_Ön panel görünümü "),
+    (" page_", " sayfası_"),
+    ("” — moved / resized", "” — taşındı / boyutu değişti"),
+    ("” — resized", "” — boyutu değişti"),
+    ("” — moved", "” — taşındı"),
     (" · change ", " · değişiklik "),
     ("previous: ", "A: "),
     ("new: ", "B: "),
@@ -609,7 +781,7 @@ def report_markdown(md, lang):
     for en in sorted(_LABELS_TR, key=len, reverse=True):
         tr = _LABELS_TR[en]
         md = md.replace("**%s**" % en, "**%s**" % tr).replace("%s: " % en, "%s: " % tr)
-    for en in ("Block diagram logic", "Block diagram layout", "Front panel", "Timed Loop / XNode internal settings",
+    for en in ("Differences not counted as changes", "Typedef / global updates", "Block diagram logic", "Block diagram layout", "Front panel", "Timed Loop / XNode internal settings",
                "Other (icon, description, settings)", "Re-saved only"):
         md = md.replace(en, TR.get(en, en))
     # change titles and details inside the lines
@@ -631,6 +803,11 @@ def report_markdown(md, lang):
         md = re.sub(rx, rep, md)
     return md
 
+
+REPORT_PICKED = {
+    "en": "_Only the {n} selected VIs (of {m} changed) are in this report._\n\n",
+    "tr": "_Bu raporda değişen {m} VI'dan yalnızca seçilen {n} tanesi var._\n\n",
+}
 
 REPORT_HEAD = {
     "en": "# viCheck comparison report\n\n**A:** `{a}`  \n**B:** `{b}`  \n**Generated:** {now} · viCheck {ver}  \n**Scope:** {scope}\n\n",

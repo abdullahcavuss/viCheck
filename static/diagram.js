@@ -17,6 +17,10 @@
     modified: { c: "#d97706", f: "rgba(217,119,6,.14)", t: T("Modified") },
     moved: { c: "#2f6feb", f: "rgba(47,111,235,.08)", t: T("Moved") },
     reframed: { c: "#8250df", f: "rgba(130,80,223,.10)", t: T("Moved into another structure/frame") },
+    // only a typedef / global it uses changed (LabVIEW updated the VI): faint, dotted
+    typedef: { c: "#8c959f", f: "rgba(140,149,159,.08)", t: T("A typedef / global it uses changed") },
+    // a difference the user does not count as a change (settings → change acceptance): faint, dotted
+    minor: { c: "#a8b1bb", f: "rgba(168,177,187,.07)", t: T("Not counted as a change") },
   };
   const STRUCT_COLORS = {
     forLoop: "#8f949b", whileLoop: "#8f949b", timeLoop: "#7d8aa0",
@@ -233,7 +237,7 @@
     ring(g, x, y, w, h, st, pad) {
       const s = ST[st];
       pad = pad == null ? 4 : pad;
-      el("rect", { x: x - pad, y: y - pad, width: w + 2 * pad, height: h + 2 * pad, rx: 4, fill: s.f, stroke: s.c, "stroke-width": st === "moved" ? 1.5 : 2.5, "stroke-dasharray": st === "moved" ? "5 3" : null, class: "hl-ring" }, g);
+      el("rect", { x: x - pad, y: y - pad, width: w + 2 * pad, height: h + 2 * pad, rx: 4, fill: s.f, stroke: s.c, "stroke-width": st === "moved" || st === "typedef" || st === "minor" ? 1.5 : 2.5, "stroke-dasharray": st === "moved" ? "5 3" : st === "typedef" || st === "minor" ? "2 3" : null, class: "hl-ring" }, g);
     }
 
     _registerNode(g, n) {
@@ -406,7 +410,7 @@
       const wg = el("g", { class: "wire" }, g);
       const d = this.wirePath(w);
       const st = this.statusOf(w);
-      if (st) el("path", { d, fill: "none", stroke: ST[st].c, "stroke-width": 7, opacity: .35, "stroke-linecap": "round", "stroke-linejoin": "round" }, wg);
+      if (st) el("path", { d, fill: "none", stroke: ST[st].c, "stroke-width": st === "minor" ? 5 : 7, opacity: st === "minor" ? .3 : .35, "stroke-linecap": "round", "stroke-linejoin": "round" }, wg);
       const col = WIRE[w.cat] || WIRE.other;
       if (w.arr) {
         el("path", { d, fill: "none", stroke: col, "stroke-width": 3.2 }, wg);

@@ -154,6 +154,34 @@ class Types:
             return None
         return text if len(text) <= limit else text[:limit - 1] + "…"
 
+    def decode_fields(self, raw_hex, heap_type_text):
+        """Top-level fields of a cluster value as {label: short hash of the full value text}, or None if the type
+        is not a cluster. Fields that cannot be decoded end the list ("…": hash of the remaining bytes)."""
+        import hashlib
+        el = self.unwrap(self.heap_el(heap_type_text))
+        if el is None or el.get("Type") != "Cluster":
+            return None
+        try:
+            b = bytes.fromhex(raw_hex or "")
+        except ValueError:
+            return None
+        h = lambda s: hashlib.md5(s.encode("utf-8", "replace") if isinstance(s, str) else s).hexdigest()[:10]
+        out, pos = {}, 0
+        for c in el.findall("TypeDesc"):
+            d = self.deref(c)
+            if d is not None and d.get("Type") == "AlignmntMarker" and not self.label(d):
+                continue
+            lab = self.label(c) or "?"
+            while lab in out:
+                lab += "'"
+            try:
+                v, pos = self._val(c, b, pos, [], 1)
+            except _Stop:
+                out["…"] = h(b[pos:])
+                break
+            out[lab] = h(v)
+        return out
+
     def _bytes(self, b, pos, n):
         chunk = b[pos:pos + n]
         if len(chunk) < n:
